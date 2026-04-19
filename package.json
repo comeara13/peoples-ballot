@@ -1,0 +1,20 @@
+{
+  "name": "all-our-ideas",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd apps/api dev & bun run --cwd apps/web dev",
+    "build": "bun run --cwd apps/web build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.8.3"
+  }
+}

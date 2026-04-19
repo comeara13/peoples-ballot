@@ -1,0 +1,89 @@
+# Claude Code Guide
+
+## Project overview
+
+All Our Ideas is a SaaS pairwise preference-voting platform. See `docs/PROJECT_SUMMARY.md` for full context, domain background, and product nuances.
+
+## Stack
+
+- **Monorepo**: `apps/web` (Next.js 16 App Router, Tailwind v4), `apps/api` (Bun + tRPC v11)
+- **Database**: PostgreSQL (Docker locally on port 5433; Neon/Supabase in prod)
+- **Auth**: Clerk (not yet wired up)
+- **Language**: TypeScript throughout
+- **Hosting**: Render or Railway (budget target: <$100/mo)
+- **Static export**: `output: 'export'` in next.config.ts — no dynamic route segments, use query params
+
+## Domain concepts
+
+- **Pairwise comparison**: each ballot shows N randomly-paired ideas; voter picks one or "can't decide"
+- **Answer Bank**: pool of ideas for a campaign — each answer has text (multi-language), category, relevance-category; newer ideas are oversampled in ballot generation
+- **Scoring formula**: `(wins + 1) / ((wins + 1) + (losses + 1))` — Bayesian win probability (same as allourideas.org); "can't decide" excluded from wins/losses
+- **Ballot lock**: ballots locked until host closes the voting window
+- **District mapping**: zip code → local/county/state/federal district resolved server-side via Census data, not user input
+
+## Data model
+
+Current schema in `apps/api/src/db/schema.ts` (Drizzle + PostgreSQL):
+
+```
+idea_banks
+  id, name, created_at
+
+ideas
+  id, idea_bank_id → idea_banks (cascade), category (optional), is_active
+  wins int DEFAULT 0, losses int DEFAULT 0
+  score float DEFAULT 50.0  ← (wins+1)/(wins+losses+2)*100, recomputed on each vote
+  created_at
+
+idea_translations
+  id, idea_id → ideas (cascade), language ('en'|'es'|...), text
+  UNIQUE (idea_id, language)
+
+prompts
+  id, idea_bank_id → idea_banks (cascade), left_idea_id → ideas, right_idea_id → ideas
+  votes_count int DEFAULT 0  ← drives catchup sampling weight: min(1/(votes_count+1), 0.05)
+  created_at
+  UNIQUE (idea_bank_id, left_idea_id, right_idea_id)
+  CHECK left_idea_id < right_idea_id  ← canonical UUID-lex ordering; ballot_pairs may flip for display
+
+ballots
+  id, idea_bank_id → idea_banks, status ('pending'|'in_progress'|'submitted'), created_at, submitted_at
+
+ballot_pairs
+  id, ballot_id → ballots (cascade), prompt_id → prompts, position
+  left_idea_id → ideas, right_idea_id → ideas  ← denormalized; may differ from prompt's canonical order
+
+votes
+  id, ballot_pair_id → ballot_pairs (cascade), selection ('left'|'right'|'cant_decide'), created_at
+  (cant_decide excluded from wins/losses; all selections increment prompt.votes_count)
+```
+
+No campaigns, parties, or participants in current scope.
+
+## Ballot generation algorithm (catchup)
+
+Adapted from allourideas.org pairwise-api. For each idea bank:
+
+1. Fetch all existing `prompts` for the bank + their `votes_count`
+2. Enumerate all valid pairs from active ideas — canonical order enforced (`left < right` UUID-lex)
+3. Assign weight per pair: `min(1 / (votes_count + 1), tau)` where `tau = 0.05`
+   - Pairs with < 20 votes all get equal weight `tau` (new ideas naturally oversampled)
+   - Pairs with ≥ 20 votes are down-weighted proportionally
+4. Normalize weights to sum 1.0; weighted random sample N pairs without replacement
+5. Upsert prompt rows for any newly seen pairs
+6. Create ballot + ballot_pairs (randomly flip left/right for each pair at display time)
+
+On vote (non-skip): increment `prompt.votes_count`, update `idea.wins`/`idea.losses`/`idea.score`.
+
+## Accessibility
+
+- Target: **WCAG 2.1 AA** throughout
+- Tailwind v4 gray palette on white (#ffffff): `gray-400` = 2.60:1 (FAIL), `gray-500` = 4.84:1 (PASS)
+- **Minimum for body text**: `text-gray-500`. Prefer `text-gray-600` for secondary/meta text
+- Never use `text-gray-300` or `text-gray-400` for readable text — reserved for decorative borders only
+
+## Key constraints
+
+- No paper ballot export (not in MVP or near-term scope)
+- PII collected by default; results always shared in aggregate only
+- Private repo; may be open-sourced later — avoid hardcoding secrets or internal assumptions
