@@ -116,10 +116,11 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
 
 function LiveBallot({ ballotId }: { ballotId: string }) {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { data: ballot, isLoading, error } = trpc.ballots.getById.useQuery({ id: ballotId });
   const [state, setState] = useState<BallotState>({});
   const submitMutation = trpc.ballots.submit.useMutation({
-    onSuccess: () => router.refresh(),
+    onSuccess: () => utils.ballots.getById.invalidate({ id: ballotId }),
   });
 
   if (isLoading) {
@@ -148,6 +149,27 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
+  // Just submitted — show results immediately from local state (no refetch wait)
+  if (submitMutation.isSuccess) {
+    const pairsWithVotes = ballot.pairs.map((p) => ({
+      ...p,
+      vote: state[p.id] ? { selection: state[p.id] } : null,
+    }));
+    return (
+      <div className="min-h-screen bg-gray-50 pb-8">
+        <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
+            <h1 className="text-base font-semibold text-gray-900">Ballot Submitted</h1>
+            <button onClick={() => router.push("/")} className="text-sm text-gray-600 hover:text-gray-900">
+              ← Change ballot
+            </button>
+          </div>
+        </div>
+        <ResultsView pairs={pairsWithVotes} />
+      </div>
+    );
+  }
+
   // Already fully voted — show read-only results
   if (ballot.voteCount > 0 && ballot.voteCount === ballot.pairs.length) {
     return (
@@ -159,7 +181,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
               onClick={() => router.push("/")}
               className="text-sm text-gray-600 hover:text-gray-900"
             >
-              ← New ballot
+              ← Change ballot
             </button>
           </div>
         </div>
