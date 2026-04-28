@@ -213,3 +213,41 @@ export const votes = pgTable(
   },
   (t) => [index("votes_ballot_pair_id_idx").on(t.ballotPairId)],
 );
+
+export const GOVERNMENT_LEVELS = [
+  "school_board",
+  "city_town",
+  "county",
+  "state",
+  "federal",
+  "all",
+  "any",
+] as const;
+
+export type GovernmentLevel = (typeof GOVERNMENT_LEVELS)[number];
+
+// Voter-submitted idea suggestions, pending human review before entering the answer bank.
+export const suggestedIdeas = pgTable("suggested_ideas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  // Nullable: suggestions survive ballot/voter deletion.
+  ballotId: uuid("ballot_id").references(() => ballots.id, { onDelete: "set null" }),
+  // Denormalized from ballot → party for direct queryability by event.
+  partyId: uuid("party_id")
+    .references(() => parties.id, { onDelete: "set null" })
+    .notNull(),
+  ideaBankId: uuid("idea_bank_id")
+    .references(() => ideaBanks.id, { onDelete: "cascade" })
+    .notNull(),
+  voterId: uuid("voter_id").references(() => voters.id, { onDelete: "set null" }),
+  text: text("text").notNull(),
+  // Stored as a native Postgres text[] — government levels are an intrinsic attribute,
+  // not a separate entity, so a junction table would add unnecessary complexity.
+  governmentLevels: text("government_levels").array().notNull().default([]),
+  testimonial: text("testimonial"),
+  status: text("status", {
+    enum: ["pending", "approved", "rejected", "merged"],
+  })
+    .default("pending")
+    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
