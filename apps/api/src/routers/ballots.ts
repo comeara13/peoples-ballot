@@ -229,29 +229,10 @@ export const ballotsRouter = router({
 
           if (v.selection === "cant_decide") continue;
 
-          const winnerId = v.selection === "left" ? pair.leftIdeaId : pair.rightIdeaId;
-          const loserId = v.selection === "left" ? pair.rightIdeaId : pair.leftIdeaId;
-
           await tx
             .update(prompts)
             .set({ votesCount: sql`${prompts.votesCount} + 1` })
             .where(eq(prompts.id, pair.promptId));
-
-          await tx
-            .update(ideas)
-            .set({
-              wins: sql`${ideas.wins} + 1`,
-              score: sql`(${ideas.wins} + 2.0) / (${ideas.wins} + ${ideas.losses} + 3.0) * 100`,
-            })
-            .where(eq(ideas.id, winnerId));
-
-          await tx
-            .update(ideas)
-            .set({
-              losses: sql`${ideas.losses} + 1`,
-              score: sql`(${ideas.wins} + 1.0) / (${ideas.wins} + ${ideas.losses} + 3.0) * 100`,
-            })
-            .where(eq(ideas.id, loserId));
         }
 
         await tx

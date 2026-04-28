@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { eq, count, inArray, desc } from "drizzle-orm";
+import { eq, count, inArray, or, and, ne } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
-import { ideaBanks, ideas, ideaTranslations } from "../db/schema";
+import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes } from "../db/schema";
+import { computeScore } from "../scoring";
 
 export const ideaBanksRouter = router({
   create: publicProcedure
@@ -40,24 +41,80 @@ export const ideaBanksRouter = router({
       const ideasList = await db
         .select()
         .from(ideas)
-        .where(eq(ideas.ideaBankId, input.id))
-        .orderBy(desc(ideas.score), desc(ideas.wins));
+        .where(eq(ideas.ideaBankId, input.id));
+
+      const ideaIds = ideasList.map((i) => i.id);
 
       const translations =
-        ideasList.length > 0
+        ideaIds.length > 0
           ? await db
               .select()
               .from(ideaTranslations)
-              .where(inArray(ideaTranslations.ideaId, ideasList.map((i) => i.id)))
+              .where(inArray(ideaTranslations.ideaId, ideaIds))
           : [];
+
+      // Fetch ballot_pairs involving any of this bank's ideas
+      const pairsForIdeas =
+        ideaIds.length > 0
+          ? await db
+              .select({
+                id: ballotPairs.id,
+                leftIdeaId: ballotPairs.leftIdeaId,
+                rightIdeaId: ballotPairs.rightIdeaId,
+              })
+              .from(ballotPairs)
+              .where(
+                or(
+                  inArray(ballotPairs.leftIdeaId, ideaIds),
+                  inArray(ballotPairs.rightIdeaId, ideaIds),
+                ),
+              )
+          : [];
+
+      // Non-cant_decide votes for those pairs
+      const pairIds = pairsForIdeas.map((p) => p.id);
+      const votesForPairs =
+        pairIds.length > 0
+          ? await db
+              .select({ ballotPairId: votes.ballotPairId, selection: votes.selection })
+              .from(votes)
+              .where(
+                and(
+                  inArray(votes.ballotPairId, pairIds),
+                  ne(votes.selection, "cant_decide"),
+                ),
+              )
+          : [];
+
+      // Aggregate wins/losses per idea in application code
+      const pairById = new Map(pairsForIdeas.map((p) => [p.id, p]));
+      const winsMap = new Map<string, number>();
+      const lossesMap = new Map<string, number>();
+
+      for (const vote of votesForPairs) {
+        const pair = pairById.get(vote.ballotPairId)!;
+        const winnerId = vote.selection === "left" ? pair.leftIdeaId : pair.rightIdeaId;
+        const loserId = vote.selection === "left" ? pair.rightIdeaId : pair.leftIdeaId;
+        winsMap.set(winnerId, (winsMap.get(winnerId) ?? 0) + 1);
+        lossesMap.set(loserId, (lossesMap.get(loserId) ?? 0) + 1);
+      }
 
       return {
         ...bank,
-        ideas: ideasList.map((idea) => ({
-          ...idea,
-          voteCount: idea.wins + idea.losses,
-          translations: translations.filter((t) => t.ideaId === idea.id),
-        })),
+        ideas: ideasList
+          .map((idea) => {
+            const w = winsMap.get(idea.id) ?? 0;
+            const l = lossesMap.get(idea.id) ?? 0;
+            return {
+              ...idea,
+              wins: w,
+              losses: l,
+              score: computeScore(w, l),
+              voteCount: w + l,
+              translations: translations.filter((t) => t.ideaId === idea.id),
+            };
+          })
+          .sort((a, b) => b.score - a.score || b.wins - a.wins),
       };
     }),
 
