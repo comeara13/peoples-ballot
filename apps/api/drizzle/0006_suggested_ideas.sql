@@ -1,7 +1,7 @@
 CREATE TABLE "suggested_ideas" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "ballot_id" uuid,
-  "party_id" uuid NOT NULL,
+  "party_id" uuid,
   "idea_bank_id" uuid NOT NULL,
   "voter_id" uuid,
   "text" text NOT NULL,

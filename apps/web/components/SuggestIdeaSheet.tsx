@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 const SPECIFIC_LEVELS = ["school_board", "city_town", "county", "state", "federal"] as const;
@@ -81,6 +81,10 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
   }
 
   function handleSubmitAnother() {
+    resetForm();
+  }
+
+  function resetForm() {
     setText("");
     setLevels([]);
     setTestimonial("");
@@ -89,16 +93,16 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
   }
 
   function handleClose() {
-    // Reset state on close so re-opening feels fresh
-    if (phase === "success") {
-      setText("");
-      setLevels([]);
-      setTestimonial("");
-      submit.reset();
-      setPhase("form");
-    }
+    resetForm();
     onClose();
   }
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") { resetForm(); onClose(); } };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -141,6 +145,7 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                   placeholder="Your idea…"
                   maxLength={2000}
                   rows={4}
+                  autoFocus
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-1 text-right">
@@ -187,6 +192,9 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                   rows={4}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
+                <p className="text-xs text-gray-500 mt-1 text-right">
+                  {testimonial.length} / 5000
+                </p>
               </div>
 
               {/* Review note */}

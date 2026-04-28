@@ -753,9 +753,7 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
   );
 }
 
-function PartySuggestionsSection({ partyId }: { partyId: string }) {
-  const { data, isLoading } = trpc.suggestedIdeas.listByParty.useQuery({ partyId });
-
+function SuggestionsSection({ data, isLoading }: { data: SuggestionRow[] | undefined; isLoading: boolean }) {
   return (
     <div className="mt-8">
       <h2 className="text-base font-semibold text-gray-900 mb-4">
@@ -782,33 +780,14 @@ function PartySuggestionsSection({ partyId }: { partyId: string }) {
   );
 }
 
+function PartySuggestionsSection({ partyId }: { partyId: string }) {
+  const { data, isLoading } = trpc.suggestedIdeas.listByParty.useQuery({ partyId });
+  return <SuggestionsSection data={data} isLoading={isLoading} />;
+}
+
 function BankSuggestionsSection({ ideaBankId }: { ideaBankId: string }) {
   const { data, isLoading } = trpc.suggestedIdeas.listByBank.useQuery({ ideaBankId });
-
-  return (
-    <div className="mt-8">
-      <h2 className="text-base font-semibold text-gray-900 mb-4">
-        Suggested Ideas
-        {data && data.length > 0 && (
-          <span className="ml-2 text-sm font-normal text-gray-500">({data.length})</span>
-        )}
-      </h2>
-
-      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
-
-      {!isLoading && !data?.length && (
-        <p className="text-sm text-gray-600">No suggestions yet.</p>
-      )}
-
-      {data && data.length > 0 && (
-        <div className="space-y-3">
-          {data.map((s) => (
-            <SuggestionCard key={s.id} suggestion={s} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return <SuggestionsSection data={data} isLoading={isLoading} />;
 }
 
 // ─── Party Section (shown on bank detail page) ───────────────────────────────

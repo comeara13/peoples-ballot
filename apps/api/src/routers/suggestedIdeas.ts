@@ -92,7 +92,7 @@ export const suggestedIdeasRouter = router({
           voterLastName: voters.lastName,
         })
         .from(suggestedIdeas)
-        .innerJoin(parties, eq(parties.id, suggestedIdeas.partyId))
+        .leftJoin(parties, eq(parties.id, suggestedIdeas.partyId))
         .leftJoin(voters, eq(voters.id, suggestedIdeas.voterId))
         .where(eq(suggestedIdeas.ideaBankId, input.ideaBankId))
         .orderBy(desc(suggestedIdeas.createdAt));

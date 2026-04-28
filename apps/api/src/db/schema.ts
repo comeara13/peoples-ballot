@@ -231,10 +231,8 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
   id: uuid("id").defaultRandom().primaryKey(),
   // Nullable: suggestions survive ballot/voter deletion.
   ballotId: uuid("ballot_id").references(() => ballots.id, { onDelete: "set null" }),
-  // Denormalized from ballot → party for direct queryability by event.
-  partyId: uuid("party_id")
-    .references(() => parties.id, { onDelete: "set null" })
-    .notNull(),
+  // Denormalized from ballot → party; nullable so suggestions survive party deletion.
+  partyId: uuid("party_id").references(() => parties.id, { onDelete: "set null" }),
   ideaBankId: uuid("idea_bank_id")
     .references(() => ideaBanks.id, { onDelete: "cascade" })
     .notNull(),
