@@ -28,7 +28,11 @@ describe("computeScore", () => {
 
   it("is always strictly between 0 and 100", () => {
     const cases: [number, number][] = [
-      [0, 0], [100, 0], [0, 100], [1, 1000], [1000, 1],
+      [0, 0],
+      [100, 0],
+      [0, 100],
+      [1, 1000],
+      [1000, 1],
     ];
     for (const [w, l] of cases) {
       const s = computeScore(w, l);
@@ -46,14 +50,24 @@ describe("scoreAfterWin", () => {
   });
 
   it("is always greater than current score", () => {
-    const cases: [number, number][] = [[0, 0], [5, 3], [10, 10], [0, 20]];
+    const cases: [number, number][] = [
+      [0, 0],
+      [5, 3],
+      [10, 10],
+      [0, 20],
+    ];
     for (const [w, l] of cases) {
       expect(scoreAfterWin(w, l)).toBeGreaterThan(computeScore(w, l));
     }
   });
 
   it("matches the SQL expression used in votes.ts: (wins+2)/(wins+losses+3)*100", () => {
-    const cases: [number, number][] = [[0, 0], [7, 4], [15, 5], [3, 20]];
+    const cases: [number, number][] = [
+      [0, 0],
+      [7, 4],
+      [15, 5],
+      [3, 20],
+    ];
     for (const [w, l] of cases) {
       const sqlFormula = ((w + 2) / (w + l + 3)) * 100;
       expect(scoreAfterWin(w, l)).toBeCloseTo(sqlFormula, 10);
@@ -69,14 +83,24 @@ describe("scoreAfterLoss", () => {
   });
 
   it("is always less than current score", () => {
-    const cases: [number, number][] = [[0, 0], [5, 3], [10, 10], [20, 0]];
+    const cases: [number, number][] = [
+      [0, 0],
+      [5, 3],
+      [10, 10],
+      [20, 0],
+    ];
     for (const [w, l] of cases) {
       expect(scoreAfterLoss(w, l)).toBeLessThan(computeScore(w, l));
     }
   });
 
   it("matches the SQL expression used in votes.ts: (wins+1)/(wins+losses+3)*100", () => {
-    const cases: [number, number][] = [[0, 0], [7, 4], [15, 5], [3, 20]];
+    const cases: [number, number][] = [
+      [0, 0],
+      [7, 4],
+      [15, 5],
+      [3, 20],
+    ];
     for (const [w, l] of cases) {
       const sqlFormula = ((w + 1) / (w + l + 3)) * 100;
       expect(scoreAfterLoss(w, l)).toBeCloseTo(sqlFormula, 10);

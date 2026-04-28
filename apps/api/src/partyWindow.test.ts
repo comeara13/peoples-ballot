@@ -16,10 +16,7 @@ describe("checkPartyWindow", () => {
     });
 
     it("rejects even when current time is inside a valid window", () => {
-      const r = checkPartyWindow(
-        { status: "closed", startAt: PAST, endAt: FUTURE },
-        NOW,
-      );
+      const r = checkPartyWindow({ status: "closed", startAt: PAST, endAt: FUTURE }, NOW);
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.reason).toBe("closed");
     });
@@ -76,7 +73,10 @@ describe("checkPartyWindow", () => {
     const endAt = new Date("2025-06-01T17:00:00Z");
 
     it("rejects before window opens", () => {
-      const r = checkPartyWindow({ status: "active", startAt, endAt }, new Date("2025-06-01T08:59:59Z"));
+      const r = checkPartyWindow(
+        { status: "active", startAt, endAt },
+        new Date("2025-06-01T08:59:59Z"),
+      );
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.reason).toBe("not_started");
     });
@@ -87,12 +87,18 @@ describe("checkPartyWindow", () => {
     });
 
     it("allows in the middle of the window", () => {
-      const r = checkPartyWindow({ status: "active", startAt, endAt }, new Date("2025-06-01T12:00:00Z"));
+      const r = checkPartyWindow(
+        { status: "active", startAt, endAt },
+        new Date("2025-06-01T12:00:00Z"),
+      );
       expect(r.ok).toBe(true);
     });
 
     it("rejects after window closes", () => {
-      const r = checkPartyWindow({ status: "active", startAt, endAt }, new Date("2025-06-01T17:00:01Z"));
+      const r = checkPartyWindow(
+        { status: "active", startAt, endAt },
+        new Date("2025-06-01T17:00:01Z"),
+      );
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.reason).toBe("ended");
     });

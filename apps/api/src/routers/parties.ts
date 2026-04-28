@@ -79,21 +79,19 @@ export const partiesRouter = router({
         .orderBy(desc(parties.createdAt));
     }),
 
-  close: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
-      const [party] = await db.select().from(parties).where(eq(parties.id, input.id));
+  close: publicProcedure.input(z.object({ id: z.string().uuid() })).mutation(async ({ input }) => {
+    const [party] = await db.select().from(parties).where(eq(parties.id, input.id));
 
-      if (!party) throw new TRPCError({ code: "NOT_FOUND" });
-      if (party.status === "closed")
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Party is already closed." });
+    if (!party) throw new TRPCError({ code: "NOT_FOUND" });
+    if (party.status === "closed")
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Party is already closed." });
 
-      const [updated] = await db
-        .update(parties)
-        .set({ status: "closed", endAt: new Date() })
-        .where(eq(parties.id, input.id))
-        .returning();
+    const [updated] = await db
+      .update(parties)
+      .set({ status: "closed", endAt: new Date() })
+      .where(eq(parties.id, input.id))
+      .returning();
 
-      return updated;
-    }),
+    return updated;
+  }),
 });

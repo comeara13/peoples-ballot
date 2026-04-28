@@ -132,11 +132,7 @@ async function seed() {
 
   console.log(`Seeding "${BANK_NAME}"...`);
 
-  const existing = await db
-    .select()
-    .from(ideaBanks)
-    .where(eq(ideaBanks.name, BANK_NAME))
-    .limit(1);
+  const existing = await db.select().from(ideaBanks).where(eq(ideaBanks.name, BANK_NAME)).limit(1);
 
   if (existing.length > 0) {
     console.log("Idea bank already exists — skipping.");

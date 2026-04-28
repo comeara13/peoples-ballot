@@ -56,11 +56,16 @@ function BallotEntry() {
 
 type WindowState = "open" | "scheduled" | "ended" | "closed";
 
-function getWindowState(party: {
-  status: string;
-  startAt: Date | string;
-  endAt: Date | string | null;
-} | null | undefined): WindowState {
+function getWindowState(
+  party:
+    | {
+        status: string;
+        startAt: Date | string;
+        endAt: Date | string | null;
+      }
+    | null
+    | undefined,
+): WindowState {
   if (!party) return "open";
   if (party.status === "closed") return "closed";
   const now = new Date();
@@ -69,7 +74,11 @@ function getWindowState(party: {
   return "open";
 }
 
-function WindowBanner({ party }: { party: { status: string; startAt: Date | string; endAt: Date | string | null } | null | undefined }) {
+function WindowBanner({
+  party,
+}: {
+  party: { status: string; startAt: Date | string; endAt: Date | string | null } | null | undefined;
+}) {
   const state = getWindowState(party);
   if (state === "open") return null;
 
@@ -92,7 +101,11 @@ function WindowBanner({ party }: { party: { status: string; startAt: Date | stri
   );
 }
 
-function WindowFooter({ party }: { party: { status: string; startAt: Date | string; endAt: Date | string | null } | null | undefined }) {
+function WindowFooter({
+  party,
+}: {
+  party: { status: string; startAt: Date | string; endAt: Date | string | null } | null | undefined;
+}) {
   if (!party) return null;
   const state = getWindowState(party);
   if (state === "closed" || state === "ended") return null;
@@ -148,7 +161,9 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
               >
                 {pair.leftText}
               </div>
-              <div className="flex items-center justify-center text-xs font-bold text-gray-400">OR</div>
+              <div className="flex items-center justify-center text-xs font-bold text-gray-400">
+                OR
+              </div>
               <div
                 className={[
                   "flex-1 rounded-lg border-2 p-3 text-sm",
@@ -204,9 +219,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-sm text-red-600 mb-4">
-            {error?.message ?? "Ballot not found."}
-          </p>
+          <p className="text-sm text-red-600 mb-4">{error?.message ?? "Ballot not found."}</p>
           <button
             onClick={() => router.push("/")}
             className="text-sm text-blue-600 hover:underline"
@@ -229,7 +242,10 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
         <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <h1 className="text-base font-semibold text-gray-900">Ballot Submitted</h1>
-            <button onClick={() => router.push("/")} className="text-sm text-gray-600 hover:text-gray-900">
+            <button
+              onClick={() => router.push("/")}
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
               ← Change ballot
             </button>
           </div>
@@ -333,9 +349,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
             {" / "}
             {total} answered
             {!allAnswered && !windowClosed && (
-              <span className="ml-2 text-amber-600 text-xs">
-                ({total - answered} remaining)
-              </span>
+              <span className="ml-2 text-amber-600 text-xs">({total - answered} remaining)</span>
             )}
           </div>
           <button
@@ -347,9 +361,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
           </button>
         </div>
         {submitMutation.error && (
-          <p className="text-xs text-red-600 text-center mt-1">
-            {submitMutation.error.message}
-          </p>
+          <p className="text-xs text-red-600 text-center mt-1">{submitMutation.error.message}</p>
         )}
       </div>
     </div>
