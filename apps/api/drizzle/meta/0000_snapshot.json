@@ -46,12 +46,8 @@
           "name": "ballot_pairs_ballot_id_ballots_id_fk",
           "tableFrom": "ballot_pairs",
           "tableTo": "ballots",
-          "columnsFrom": [
-            "ballot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ballot_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -59,12 +55,8 @@
           "name": "ballot_pairs_left_idea_id_ideas_id_fk",
           "tableFrom": "ballot_pairs",
           "tableTo": "ideas",
-          "columnsFrom": [
-            "left_idea_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["left_idea_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -72,12 +64,8 @@
           "name": "ballot_pairs_right_idea_id_ideas_id_fk",
           "tableFrom": "ballot_pairs",
           "tableTo": "ideas",
-          "columnsFrom": [
-            "right_idea_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["right_idea_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -132,12 +120,8 @@
           "name": "ballots_idea_bank_id_idea_banks_id_fk",
           "tableFrom": "ballots",
           "tableTo": "idea_banks",
-          "columnsFrom": [
-            "idea_bank_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["idea_bank_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -217,12 +201,8 @@
           "name": "idea_translations_idea_id_ideas_id_fk",
           "tableFrom": "idea_translations",
           "tableTo": "ideas",
-          "columnsFrom": [
-            "idea_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["idea_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -232,10 +212,7 @@
         "idea_translations_idea_id_language_unique": {
           "name": "idea_translations_idea_id_language_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "idea_id",
-            "language"
-          ]
+          "columns": ["idea_id", "language"]
         }
       },
       "policies": {},
@@ -286,12 +263,8 @@
           "name": "ideas_idea_bank_id_idea_banks_id_fk",
           "tableFrom": "ideas",
           "tableTo": "idea_banks",
-          "columnsFrom": [
-            "idea_bank_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["idea_bank_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -339,12 +312,8 @@
           "name": "votes_ballot_pair_id_ballot_pairs_id_fk",
           "tableFrom": "votes",
           "tableTo": "ballot_pairs",
-          "columnsFrom": [
-            "ballot_pair_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ballot_pair_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

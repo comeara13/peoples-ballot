@@ -57,10 +57,7 @@ export function buildPairWeights(
  * Items are consumed from a mutable pool; higher-weight items are proportionally
  * more likely to be selected at each draw.
  */
-export function weightedSample<T extends { weight: number }>(
-  items: T[],
-  k: number,
-): T[] {
+export function weightedSample<T extends { weight: number }>(items: T[], k: number): T[] {
   const pool = [...items];
   const selected: T[] = [];
 

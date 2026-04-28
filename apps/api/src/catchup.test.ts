@@ -146,8 +146,8 @@ describe("catchup algorithm integration", () => {
     // (a,b) weight ≈ 1/101 ≈ 0.0099; others = 0.05
     // P(a,b selected in 3 of 6) ≈ much lower than P(a,c selected)
     // Rough expected rates: a,b ≈ 5%, a,c ≈ 45% — use loose bounds
-    expect(abCount / RUNS).toBeLessThan(0.20);
-    expect(acCount / RUNS).toBeGreaterThan(0.30);
+    expect(abCount / RUNS).toBeLessThan(0.2);
+    expect(acCount / RUNS).toBeGreaterThan(0.3);
   });
 
   it("new ideas (all pairs unvoted) get equal sampling probability", () => {
@@ -175,16 +175,18 @@ describe("catchup algorithm integration", () => {
     // Idea 'e' is new — all its pairs are unvoted.
     const ids = ["a", "b", "c", "d", "e"];
     const votesByKey = new Map([
-      ["a|b", 100], ["a|c", 100], ["a|d", 100],
-      ["b|c", 100], ["b|d", 100], ["c|d", 100],
+      ["a|b", 100],
+      ["a|c", 100],
+      ["a|d", 100],
+      ["b|c", 100],
+      ["b|d", 100],
+      ["c|d", 100],
     ]);
     const pairs = buildPairWeights(ids, votesByKey);
 
-    const involving = (id: string) =>
-      pairs.filter((p) => p.left === id || p.right === id);
+    const involving = (id: string) => pairs.filter((p) => p.left === id || p.right === id);
 
-    const avgWeight = (ps: typeof pairs) =>
-      ps.reduce((s, p) => s + p.weight, 0) / ps.length;
+    const avgWeight = (ps: typeof pairs) => ps.reduce((s, p) => s + p.weight, 0) / ps.length;
 
     expect(avgWeight(involving("e"))).toBeGreaterThan(avgWeight(involving("a")));
   });

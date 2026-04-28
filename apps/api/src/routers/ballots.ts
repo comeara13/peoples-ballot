@@ -27,10 +27,7 @@ export const ballotsRouter = router({
     )
     .mutation(async ({ input }) => {
       // 1. Look up party → derive ideaBankId
-      const [party] = await db
-        .select()
-        .from(parties)
-        .where(eq(parties.id, input.partyId));
+      const [party] = await db.select().from(parties).where(eq(parties.id, input.partyId));
 
       if (!party) throw new TRPCError({ code: "NOT_FOUND" });
       if (party.status === "closed")
@@ -144,64 +141,57 @@ export const ballotsRouter = router({
         .orderBy(desc(ballots.createdAt));
     }),
 
-  getById: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
-      const [ballot] = await db
-        .select()
-        .from(ballots)
-        .where(eq(ballots.id, input.id));
+  getById: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
+    const [ballot] = await db.select().from(ballots).where(eq(ballots.id, input.id));
 
-      if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
+    if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const pairs = await db
-        .select()
-        .from(ballotPairs)
-        .where(eq(ballotPairs.ballotId, input.id))
-        .orderBy(ballotPairs.position);
+    const pairs = await db
+      .select()
+      .from(ballotPairs)
+      .where(eq(ballotPairs.ballotId, input.id))
+      .orderBy(ballotPairs.position);
 
-      const [party] = await db
-        .select({ status: parties.status, startAt: parties.startAt, endAt: parties.endAt })
-        .from(parties)
-        .where(eq(parties.id, ballot.partyId));
+    const [party] = await db
+      .select({ status: parties.status, startAt: parties.startAt, endAt: parties.endAt })
+      .from(parties)
+      .where(eq(parties.id, ballot.partyId));
 
-      if (!pairs.length) return { ...ballot, party: party ?? null, voteCount: 0, pairs: [] };
+    if (!pairs.length) return { ...ballot, party: party ?? null, voteCount: 0, pairs: [] };
 
-      const ideaIds = [
-        ...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId])),
-      ];
+    const ideaIds = [...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId]))];
 
-      const translations = await db
-        .select({ ideaId: ideaTranslations.ideaId, text: ideaTranslations.text })
-        .from(ideaTranslations)
-        .where(
-          and(
-            inArray(ideaTranslations.ideaId, ideaIds),
-            eq(ideaTranslations.language, "en"),
-          ),
-        );
+    const translations = await db
+      .select({ ideaId: ideaTranslations.ideaId, text: ideaTranslations.text })
+      .from(ideaTranslations)
+      .where(and(inArray(ideaTranslations.ideaId, ideaIds), eq(ideaTranslations.language, "en")));
 
-      const textById = new Map(translations.map((t) => [t.ideaId, t.text]));
+    const textById = new Map(translations.map((t) => [t.ideaId, t.text]));
 
-      const votesList = await db
-        .select()
-        .from(votes)
-        .where(inArray(votes.ballotPairId, pairs.map((p) => p.id)));
+    const votesList = await db
+      .select()
+      .from(votes)
+      .where(
+        inArray(
+          votes.ballotPairId,
+          pairs.map((p) => p.id),
+        ),
+      );
 
-      const voteByPairId = new Map(votesList.map((v) => [v.ballotPairId, v]));
+    const voteByPairId = new Map(votesList.map((v) => [v.ballotPairId, v]));
 
-      return {
-        ...ballot,
-        party: party ?? null,
-        voteCount: votesList.length,
-        pairs: pairs.map((pair) => ({
-          ...pair,
-          leftText: textById.get(pair.leftIdeaId) ?? "(no translation)",
-          rightText: textById.get(pair.rightIdeaId) ?? "(no translation)",
-          vote: voteByPairId.get(pair.id) ?? null,
-        })),
-      };
-    }),
+    return {
+      ...ballot,
+      party: party ?? null,
+      voteCount: votesList.length,
+      pairs: pairs.map((pair) => ({
+        ...pair,
+        leftText: textById.get(pair.leftIdeaId) ?? "(no translation)",
+        rightText: textById.get(pair.rightIdeaId) ?? "(no translation)",
+        vote: voteByPairId.get(pair.id) ?? null,
+      })),
+    };
+  }),
 
   submit: publicProcedure
     .input(
@@ -216,10 +206,7 @@ export const ballotsRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      const [ballot] = await db
-        .select()
-        .from(ballots)
-        .where(eq(ballots.id, input.ballotId));
+      const [ballot] = await db.select().from(ballots).where(eq(ballots.id, input.ballotId));
 
       if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
       if (ballot.status === "submitted")
@@ -228,8 +215,7 @@ export const ballotsRouter = router({
       const [submitParty] = await db.select().from(parties).where(eq(parties.id, ballot.partyId));
       if (submitParty) {
         const result = checkPartyWindow(submitParty);
-        if (!result.ok)
-          throw new TRPCError({ code: "BAD_REQUEST", message: result.message });
+        if (!result.ok) throw new TRPCError({ code: "BAD_REQUEST", message: result.message });
       }
 
       const pairs = await db

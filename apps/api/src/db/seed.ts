@@ -1,5 +1,5 @@
 import { db } from "./index";
-import { ideaBanks, ideas, ideaTranslations, parties } from "./schema";
+import { affiliations, ideaBanks, ideas, ideaTranslations, parties } from "./schema";
 import { eq } from "drizzle-orm";
 
 const BANK_NAME = "Vote Equity — Chicago 2019";
@@ -115,14 +115,24 @@ const IDEAS: { text: string }[] = [
   },
 ];
 
+const DEFAULT_AFFILIATIONS = [
+  { name: "Democratic Party", type: "political_party" as const },
+  { name: "Republican Party", type: "political_party" as const },
+  { name: "Independent", type: "political_party" as const },
+  { name: "Green Party", type: "political_party" as const },
+  { name: "Libertarian Party", type: "political_party" as const },
+  { name: "Other", type: "other" as const },
+  { name: "Prefer not to say", type: "other" as const },
+];
+
 async function seed() {
+  // Always upsert platform-wide affiliations — idempotent.
+  await db.insert(affiliations).values(DEFAULT_AFFILIATIONS).onConflictDoNothing();
+  console.log("Seeded platform affiliations");
+
   console.log(`Seeding "${BANK_NAME}"...`);
 
-  const existing = await db
-    .select()
-    .from(ideaBanks)
-    .where(eq(ideaBanks.name, BANK_NAME))
-    .limit(1);
+  const existing = await db.select().from(ideaBanks).where(eq(ideaBanks.name, BANK_NAME)).limit(1);
 
   if (existing.length > 0) {
     console.log("Idea bank already exists — skipping.");

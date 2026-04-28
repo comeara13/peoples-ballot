@@ -8,15 +8,14 @@ import {
   unique,
   check,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const ideaBanks = pgTable("idea_banks", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const ideas = pgTable("ideas", {
@@ -26,9 +25,7 @@ export const ideas = pgTable("ideas", {
     .notNull(),
   category: text("category"),
   isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // All idea text lives here — no text column on `ideas` itself.
@@ -62,9 +59,7 @@ export const prompts = pgTable(
       .references(() => ideas.id)
       .notNull(),
     votesCount: integer("votes_count").default(0).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     unique().on(t.ideaBankId, t.leftIdeaId, t.rightIdeaId),
@@ -85,15 +80,79 @@ export const parties = pgTable(
     status: text("status", { enum: ["active", "closed"] })
       .default("active")
       .notNull(),
-    startAt: timestamp("start_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    startAt: timestamp("start_at", { withTimezone: true }).defaultNow().notNull(),
     endAt: timestamp("end_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("parties_idea_bank_id_idx").on(t.ideaBankId)],
+);
+
+// OMB Statistical Policy Directive 15 (SPD-15, updated March 2024) race/ethnicity categories.
+// Multi-select: a person may select more than one. "prefer_not_to_say" is mutually exclusive.
+export const RACE_ETHNICITY_CATEGORIES = [
+  "white",
+  "black_african_american",
+  "american_indian_alaska_native",
+  "asian",
+  "native_hawaiian_pacific_islander",
+  "middle_eastern_north_african",
+  "prefer_not_to_say",
+] as const;
+
+export type RaceEthnicityCategory = (typeof RACE_ETHNICITY_CATEGORIES)[number];
+
+// Global voter identity. Deduped by email until Clerk auth lands.
+export const voters = pgTable("voters", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  clerkUserId: text("clerk_user_id").unique(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").unique(),
+  // Address fields normalized by Google Places Autocomplete on the frontend.
+  addressStreet: text("address_street"),
+  addressCity: text("address_city"),
+  addressState: text("address_state"), // 2-char USPS code
+  addressZip: text("address_zip"),
+  // CCPA/GDPR: record when the voter consented to data collection.
+  consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Multi-select race/ethnicity per OMB SPD-15 2024. One row per selected category per voter.
+export const voterRaceEthnicity = pgTable(
+  "voter_race_ethnicity",
+  {
+    voterId: uuid("voter_id")
+      .references(() => voters.id, { onDelete: "cascade" })
+      .notNull(),
+    category: text("category", { enum: RACE_ETHNICITY_CATEGORIES }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.voterId, t.category] })],
+);
+
+// Platform-wide canonical affiliation groups. Seeded at deploy time; campaigns share the same list.
+export const affiliations = pgTable("affiliations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().unique(),
+  type: text("type", {
+    enum: ["political_party", "civic_org", "labor_union", "faith_community", "other"],
+  }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Many-to-many: a voter may belong to multiple affiliation groups.
+export const voterAffiliations = pgTable(
+  "voter_affiliations",
+  {
+    voterId: uuid("voter_id")
+      .references(() => voters.id, { onDelete: "cascade" })
+      .notNull(),
+    affiliationId: uuid("affiliation_id")
+      .references(() => affiliations.id)
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.voterId, t.affiliationId] })],
 );
 
 export const ballots = pgTable(
@@ -103,15 +162,14 @@ export const ballots = pgTable(
     partyId: uuid("party_id")
       .references(() => parties.id, { onDelete: "cascade" })
       .notNull(),
+    voterId: uuid("voter_id").references(() => voters.id),
     status: text("status", { enum: ["pending", "in_progress", "submitted"] })
       .default("pending")
       .notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
   },
-  (t) => [index("ballots_party_id_idx").on(t.partyId)],
+  (t) => [index("ballots_party_id_idx").on(t.partyId), index("ballots_voter_id_idx").on(t.voterId)],
 );
 
 // A ballot_pair is one instance of a prompt being shown in a specific ballot at a specific position.
@@ -151,9 +209,7 @@ export const votes = pgTable(
     selection: text("selection", {
       enum: ["left", "right", "cant_decide"],
     }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("votes_ballot_pair_id_idx").on(t.ballotPairId)],
 );

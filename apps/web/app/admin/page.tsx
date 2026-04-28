@@ -14,7 +14,11 @@ function toDatetimeLocal(date: Date | string | null | undefined): string {
   return local.toISOString().slice(0, 16);
 }
 
-function windowStatus(party: { startAt: Date | string; endAt: Date | string | null; status: string }) {
+function windowStatus(party: {
+  startAt: Date | string;
+  endAt: Date | string | null;
+  status: string;
+}) {
   if (party.status === "closed") return "closed" as const;
   const now = new Date();
   if (now < new Date(party.startAt)) return "scheduled" as const;
@@ -68,9 +72,7 @@ function CreateBankForm({
           autoFocus
           className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
         />
-        {create.error && (
-          <p className="text-xs text-red-600">{create.error.message}</p>
-        )}
+        {create.error && <p className="text-xs text-red-600">{create.error.message}</p>}
         <div className="flex gap-2">
           <button
             onClick={() => name.trim() && create.mutate({ name: name.trim() })}
@@ -136,9 +138,7 @@ function BankList() {
               onClick={() => router.push(`/admin?bankId=${bank.id}`)}
               className="text-left border border-gray-200 rounded-lg p-4 hover:border-blue-400 hover:bg-blue-50 transition-colors group"
             >
-              <div className="font-medium text-gray-900 group-hover:text-blue-700">
-                {bank.name}
-              </div>
+              <div className="font-medium text-gray-900 group-hover:text-blue-700">{bank.name}</div>
               <div className="text-sm text-gray-600 mt-1">
                 {Number(bank.ideaCount)} {Number(bank.ideaCount) === 1 ? "idea" : "ideas"}
               </div>
@@ -155,13 +155,7 @@ function BankList() {
 
 // ─── Translation Row ──────────────────────────────────────────────────────────
 
-function TranslationRow({
-  translation,
-  onEdit,
-}: {
-  translation: Translation;
-  onEdit: () => void;
-}) {
+function TranslationRow({ translation, onEdit }: { translation: Translation; onEdit: () => void }) {
   return (
     <div className="flex items-start gap-3 py-1.5 text-sm border-t border-gray-200">
       <span className="w-8 font-mono text-xs text-gray-600 uppercase mt-0.5 shrink-0">
@@ -491,9 +485,7 @@ function PairRow({
 
   return (
     <div className="flex items-start gap-3 py-2 border-t border-gray-100 text-sm">
-      <span className="text-gray-500 font-mono text-xs w-5 shrink-0 mt-0.5">
-        {pair.position}.
-      </span>
+      <span className="text-gray-500 font-mono text-xs w-5 shrink-0 mt-0.5">{pair.position}.</span>
       <div className="flex-1 min-w-0 space-y-0.5">
         <p
           className={`truncate leading-snug ${
@@ -573,9 +565,7 @@ function BallotCard({
         onClick={onToggle}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
       >
-        <span className="font-mono text-xs text-gray-500 shrink-0 select-all">
-          {ballot.id}
-        </span>
+        <span className="font-mono text-xs text-gray-500 shrink-0 select-all">{ballot.id}</span>
         <span
           className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[ballot.status] ?? STATUS_STYLES.pending}`}
         >
@@ -711,16 +701,17 @@ function PartySection({ bankId }: { bankId: string }) {
       {showCreate && (
         <CreatePartyForm
           bankId={bankId}
-          onCreated={() => { setShowCreate(false); refetch(); }}
+          onCreated={() => {
+            setShowCreate(false);
+            refetch();
+          }}
           onCancel={() => setShowCreate(false)}
         />
       )}
 
       {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
 
-      {!isLoading && !data?.length && (
-        <p className="text-sm text-gray-600">No parties yet.</p>
-      )}
+      {!isLoading && !data?.length && <p className="text-sm text-gray-600">No parties yet.</p>}
 
       {data?.length ? (
         <div className="space-y-2">
@@ -741,7 +732,9 @@ function PartySection({ bankId }: { bankId: string }) {
                 </span>
               </div>
               <div className="flex gap-4 mt-1.5 text-xs text-gray-600">
-                <span>{party.ballotCount} {party.ballotCount === 1 ? "ballot" : "ballots"}</span>
+                <span>
+                  {party.ballotCount} {party.ballotCount === 1 ? "ballot" : "ballots"}
+                </span>
                 <span>{party.voteCount} votes</span>
                 <span>{new Date(party.startAt).toLocaleDateString()}</span>
                 {party.endAt && <span>→ {new Date(party.endAt).toLocaleDateString()}</span>}
@@ -765,9 +758,9 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
   const [startAtOverride, setStartAtOverride] = useState<string | null>(null);
   const [endAtOverride, setEndAtOverride] = useState<string | null>(null);
 
-  const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery(
-    { partyId },
-  );
+  const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery({
+    partyId,
+  });
   const { data: partiesList } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
   const party = partiesList?.find((p) => p.id === partyId);
 
@@ -775,7 +768,10 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
   const windowEndAt = endAtOverride ?? toDatetimeLocal(party?.endAt);
 
   const generate = trpc.ballots.generate.useMutation({
-    onSuccess: () => { setGenerateError(null); refetchBallots(); },
+    onSuccess: () => {
+      setGenerateError(null);
+      refetchBallots();
+    },
     onError: (e) => setGenerateError(e.message),
   });
 
@@ -817,17 +813,23 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-gray-900">
-              {party?.name ?? "Party"}
-            </h1>
+            <h1 className="text-xl font-semibold text-gray-900">{party?.name ?? "Party"}</h1>
             {party && (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PARTY_STATUS_STYLES[party.status] ?? ""}`}>
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${PARTY_STATUS_STYLES[party.status] ?? ""}`}
+              >
                 {party.status}
               </span>
             )}
             {currentWindowStatus && currentWindowStatus !== "closed" && (
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${WINDOW_STATUS_STYLES[currentWindowStatus]}`}>
-                {currentWindowStatus === "open" ? "voting open" : currentWindowStatus === "scheduled" ? "scheduled" : "voting ended"}
+              <span
+                className={`text-xs font-medium px-2 py-0.5 rounded-full ${WINDOW_STATUS_STYLES[currentWindowStatus]}`}
+              >
+                {currentWindowStatus === "open"
+                  ? "voting open"
+                  : currentWindowStatus === "scheduled"
+                    ? "scheduled"
+                    : "voting ended"}
               </span>
             )}
           </div>
@@ -846,7 +848,9 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
       {/* Voting window editor */}
       {party && (
         <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
-          <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Voting Window</h2>
+          <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+            Voting Window
+          </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-gray-600 mb-1">Opens</label>
@@ -881,9 +885,7 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
               {update.isSuccess && !windowDirty && (
                 <span className="text-xs text-green-600">Saved</span>
               )}
-              {update.error && (
-                <span className="text-xs text-red-600">{update.error.message}</span>
-              )}
+              {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
             </div>
           )}
         </div>
