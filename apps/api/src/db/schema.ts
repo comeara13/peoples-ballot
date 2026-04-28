@@ -15,9 +15,7 @@ import { sql } from "drizzle-orm";
 export const ideaBanks = pgTable("idea_banks", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const ideas = pgTable("ideas", {
@@ -27,9 +25,7 @@ export const ideas = pgTable("ideas", {
     .notNull(),
   category: text("category"),
   isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // All idea text lives here — no text column on `ideas` itself.
@@ -63,9 +59,7 @@ export const prompts = pgTable(
       .references(() => ideas.id)
       .notNull(),
     votesCount: integer("votes_count").default(0).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     unique().on(t.ideaBankId, t.leftIdeaId, t.rightIdeaId),
@@ -86,13 +80,9 @@ export const parties = pgTable(
     status: text("status", { enum: ["active", "closed"] })
       .default("active")
       .notNull(),
-    startAt: timestamp("start_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    startAt: timestamp("start_at", { withTimezone: true }).defaultNow().notNull(),
     endAt: timestamp("end_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("parties_idea_bank_id_idx").on(t.ideaBankId)],
 );
@@ -132,13 +122,12 @@ export const voters = pgTable("voters", {
 export const voterRaceEthnicity = pgTable(
   "voter_race_ethnicity",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
     voterId: uuid("voter_id")
       .references(() => voters.id, { onDelete: "cascade" })
       .notNull(),
     category: text("category", { enum: RACE_ETHNICITY_CATEGORIES }).notNull(),
   },
-  (t) => [unique().on(t.voterId, t.category)],
+  (t) => [primaryKey({ columns: [t.voterId, t.category] })],
 );
 
 // Platform-wide canonical affiliation groups. Seeded at deploy time; campaigns share the same list.
@@ -173,17 +162,14 @@ export const ballots = pgTable(
     partyId: uuid("party_id")
       .references(() => parties.id, { onDelete: "cascade" })
       .notNull(),
-    voterId: uuid("voter_id")
-      .references(() => voters.id),
+    voterId: uuid("voter_id").references(() => voters.id),
     status: text("status", { enum: ["pending", "in_progress", "submitted"] })
       .default("pending")
       .notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
   },
-  (t) => [index("ballots_party_id_idx").on(t.partyId)],
+  (t) => [index("ballots_party_id_idx").on(t.partyId), index("ballots_voter_id_idx").on(t.voterId)],
 );
 
 // A ballot_pair is one instance of a prompt being shown in a specific ballot at a specific position.
@@ -223,9 +209,7 @@ export const votes = pgTable(
     selection: text("selection", {
       enum: ["left", "right", "cant_decide"],
     }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("votes_ballot_pair_id_idx").on(t.ballotPairId)],
 );

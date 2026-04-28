@@ -19,6 +19,13 @@ const RACE_ETHNICITY_OPTIONS = [
   { value: "prefer_not_to_say", label: "Prefer not to say" },
 ] as const;
 
+type RaceEthnicityValue = (typeof RACE_ETHNICITY_OPTIONS)[number]["value"];
+// Tuple cast required by z.enum — same values, typed as non-empty tuple.
+const RACE_ETHNICITY_VALUES = RACE_ETHNICITY_OPTIONS.map((o) => o.value) as [
+  RaceEthnicityValue,
+  ...RaceEthnicityValue[],
+];
+
 const schema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
@@ -28,8 +35,11 @@ const schema = z.object({
   addressState: z.string().optional(),
   addressZip: z.string().optional(),
   raceEthnicityCategories: z
-    .array(z.string())
-    .min(1, "Please select at least one option"),
+    .array(z.enum(RACE_ETHNICITY_VALUES))
+    .min(1, "Please select at least one option")
+    .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
+      message: '"Prefer not to say" cannot be combined with other selections.',
+    }),
   affiliationIds: z.array(z.string()),
   consent: z.literal(true, {
     errorMap: () => ({ message: "You must consent to continue" }),
@@ -72,20 +82,21 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
     if (!apiKey || !addressInputRef.current) return;
 
     const inputEl = addressInputRef.current;
+    let autocomplete: google.maps.places.Autocomplete | undefined;
 
     setOptions({ key: apiKey, v: "weekly" });
 
     importLibrary("places")
       .then((places) => {
         const { Autocomplete } = places as google.maps.PlacesLibrary;
-        const autocomplete = new Autocomplete(inputEl, {
+        autocomplete = new Autocomplete(inputEl, {
           types: ["address"],
           componentRestrictions: { country: "us" },
           fields: ["address_components"],
         });
 
         autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
+          const place = autocomplete!.getPlace();
           if (!place.address_components) return;
 
           let streetNumber = "";
@@ -108,19 +119,21 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
           setValue("addressCity", city);
           setValue("addressState", state);
           setValue("addressZip", zip);
-          if (inputEl) inputEl.value = street;
+          inputEl.value = street;
         });
       })
       .catch(() => {
         // Google Maps unavailable — address field works as plain text input
       });
+
+    return () => {
+      if (autocomplete) {
+        google.maps.event.clearInstanceListeners(autocomplete);
+      }
+    };
   }, [setValue]);
 
   async function onSubmit(values: FormValues) {
-    type ValidCategory = Parameters<
-      typeof registerMutation.mutateAsync
-    >[0]["raceEthnicityCategories"][number];
-
     await registerMutation.mutateAsync({
       ballotId,
       firstName: values.firstName,
@@ -130,14 +143,11 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
       addressCity: values.addressCity,
       addressState: values.addressState,
       addressZip: values.addressZip,
-      raceEthnicityCategories: values.raceEthnicityCategories as ValidCategory[],
+      raceEthnicityCategories: values.raceEthnicityCategories,
       affiliationIds: values.affiliationIds,
       consentedAt: new Date().toISOString(),
     });
   }
-
-  const politicalAffiliations = affiliationsList?.filter((a) => a.type === "political_party") ?? [];
-  const otherAffiliations = affiliationsList?.filter((a) => a.type !== "political_party") ?? [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-start justify-center px-4 py-12">
@@ -150,26 +160,42 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Name */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Name</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3" id="name-group">
+              Name
+            </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <label htmlFor="firstName" className="sr-only">
+                  First name
+                </label>
                 <input
                   {...register("firstName")}
+                  id="firstName"
                   placeholder="First name"
+                  aria-describedby={errors.firstName ? "firstName-error" : undefined}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors.firstName && (
-                  <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>
+                  <p id="firstName-error" className="text-xs text-red-600 mt-1">
+                    {errors.firstName.message}
+                  </p>
                 )}
               </div>
               <div>
+                <label htmlFor="lastName" className="sr-only">
+                  Last name
+                </label>
                 <input
                   {...register("lastName")}
+                  id="lastName"
                   placeholder="Last name"
+                  aria-describedby={errors.lastName ? "lastName-error" : undefined}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {errors.lastName && (
-                  <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>
+                  <p id="lastName-error" className="text-xs text-red-600 mt-1">
+                    {errors.lastName.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -177,27 +203,27 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
               Email <span className="font-normal text-gray-500">(optional)</span>
             </label>
             <input
               {...register("email")}
+              id="email"
               type="email"
               placeholder="you@example.com"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            {errors.email && (
-              <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>
-            )}
+            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
           </div>
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
               Address <span className="font-normal text-gray-500">(optional)</span>
             </label>
             <input
               ref={addressInputRef}
+              id="address"
               placeholder="Start typing your address…"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -209,9 +235,11 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
           </div>
 
           {/* Race / Ethnicity */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Race / Ethnicity</h3>
-            <p className="text-xs text-gray-500 mb-3">Select all that apply.</p>
+          <fieldset>
+            <legend className="text-sm font-semibold text-gray-700 mb-1">Race / Ethnicity</legend>
+            <p className="text-xs text-gray-500 mb-3">
+              Select all that apply. &ldquo;Prefer not to say&rdquo; is mutually exclusive.
+            </p>
             <Controller
               name="raceEthnicityCategories"
               control={control}
@@ -224,8 +252,13 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                         value={option.value}
                         checked={field.value.includes(option.value)}
                         onChange={(e) => {
-                          if (e.target.checked) {
-                            field.onChange([...field.value, option.value]);
+                          if (option.value === "prefer_not_to_say") {
+                            field.onChange(e.target.checked ? ["prefer_not_to_say"] : []);
+                          } else if (e.target.checked) {
+                            field.onChange([
+                              ...field.value.filter((v) => v !== "prefer_not_to_say"),
+                              option.value,
+                            ]);
                           } else {
                             field.onChange(field.value.filter((v) => v !== option.value));
                           }
@@ -239,18 +272,15 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
               )}
             />
             {errors.raceEthnicityCategories && (
-              <p className="text-xs text-red-600 mt-2">
-                {errors.raceEthnicityCategories.message}
-              </p>
+              <p className="text-xs text-red-600 mt-2">{errors.raceEthnicityCategories.message}</p>
             )}
-          </div>
+          </fieldset>
 
           {/* Political Affiliation */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">
-              Political Affiliation{" "}
-              <span className="font-normal text-gray-500">(optional)</span>
-            </h3>
+          <fieldset>
+            <legend className="text-sm font-semibold text-gray-700 mb-1">
+              Political Affiliation <span className="font-normal text-gray-500">(optional)</span>
+            </legend>
             <p className="text-xs text-gray-500 mb-3">Select all that apply.</p>
             {affiliationsLoading ? (
               <p className="text-sm text-gray-500">Loading…</p>
@@ -260,25 +290,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                 control={control}
                 render={({ field }) => (
                   <div className="space-y-2">
-                    {politicalAffiliations.map((aff) => (
-                      <label key={aff.id} className="flex items-center gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          value={aff.id}
-                          checked={field.value.includes(aff.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              field.onChange([...field.value, aff.id]);
-                            } else {
-                              field.onChange(field.value.filter((v) => v !== aff.id));
-                            }
-                          }}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">{aff.name}</span>
-                      </label>
-                    ))}
-                    {otherAffiliations.map((aff) => (
+                    {(affiliationsList ?? []).map((aff) => (
                       <label key={aff.id} className="flex items-center gap-2.5 cursor-pointer">
                         <input
                           type="checkbox"
@@ -300,7 +312,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                 )}
               />
             )}
-          </div>
+          </fieldset>
 
           {/* Consent */}
           <div className="border-t border-gray-100 pt-5">

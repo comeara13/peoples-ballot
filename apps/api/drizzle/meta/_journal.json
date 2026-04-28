@@ -17,17 +17,24 @@
       "breakpoints": true
     },
     {
+      "idx": 2,
+      "version": "7",
+      "when": 1776640000000,
+      "tag": "0002_drop_idea_scores",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776680000000,
+      "tag": "0003_parties",
+      "breakpoints": true
+    },
+    {
       "idx": 4,
       "version": "7",
       "when": 1776700000000,
       "tag": "0004_voters",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1776701000000,
-      "tag": "0005_ballot_voter_nullable",
       "breakpoints": true
     }
   ]
