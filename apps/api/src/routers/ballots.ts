@@ -7,6 +7,7 @@ import {
   ballots,
   ballotPairs,
   ideas,
+  parties,
   prompts,
   ideaTranslations,
   votes,
@@ -19,18 +20,31 @@ export const ballotsRouter = router({
   generate: publicProcedure
     .input(
       z.object({
-        ideaBankId: z.string().uuid(),
+        partyId: z.string().uuid(),
         pairCount: z.number().int().min(1).max(50).default(10),
       }),
     )
     .mutation(async ({ input }) => {
-      // 1. Active ideas
+      // 1. Look up party → derive ideaBankId
+      const [party] = await db
+        .select()
+        .from(parties)
+        .where(eq(parties.id, input.partyId));
+
+      if (!party) throw new TRPCError({ code: "NOT_FOUND" });
+      if (party.status === "closed")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot generate ballots for a closed party.",
+        });
+
+      const ideaBankId = party.ideaBankId;
+
+      // 2. Active ideas
       const activeIdeas = await db
         .select({ id: ideas.id })
         .from(ideas)
-        .where(
-          and(eq(ideas.ideaBankId, input.ideaBankId), eq(ideas.isActive, true)),
-        );
+        .where(and(eq(ideas.ideaBankId, ideaBankId), eq(ideas.isActive, true)));
 
       if (activeIdeas.length < 2) {
         throw new TRPCError({
@@ -39,7 +53,7 @@ export const ballotsRouter = router({
         });
       }
 
-      // 2. Existing prompt vote history for catchup weights
+      // 3. Existing prompt vote history for catchup weights (bank-wide)
       const existingPrompts = await db
         .select({
           id: prompts.id,
@@ -48,22 +62,26 @@ export const ballotsRouter = router({
           votesCount: prompts.votesCount,
         })
         .from(prompts)
-        .where(eq(prompts.ideaBankId, input.ideaBankId));
+        .where(eq(prompts.ideaBankId, ideaBankId));
 
-      const promptById = new Map(existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p]));
-      const votesByKey = new Map(existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p.votesCount]));
+      const promptById = new Map(
+        existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p]),
+      );
+      const votesByKey = new Map(
+        existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p.votesCount]),
+      );
 
-      // 3. Catchup sampling
+      // 4. Catchup sampling
       const ideaIds = activeIdeas.map((i) => i.id);
       const weighted = buildPairWeights(ideaIds, votesByKey);
       const k = Math.min(input.pairCount, weighted.length);
       const selected = weightedSample(weighted, k);
 
-      // 4. Persist ballot + pairs in a transaction
+      // 5. Persist ballot + pairs in a transaction
       return db.transaction(async (tx) => {
         const [ballot] = await tx
           .insert(ballots)
-          .values({ ideaBankId: input.ideaBankId, status: "pending" })
+          .values({ partyId: input.partyId, status: "pending" })
           .returning();
 
         for (let i = 0; i < selected.length; i++) {
@@ -78,7 +96,7 @@ export const ballotsRouter = router({
             const [p] = await tx
               .insert(prompts)
               .values({
-                ideaBankId: input.ideaBankId,
+                ideaBankId,
                 leftIdeaId: pair.left,
                 rightIdeaId: pair.right,
               })
@@ -105,8 +123,8 @@ export const ballotsRouter = router({
       });
     }),
 
-  listByBank: publicProcedure
-    .input(z.object({ ideaBankId: z.string().uuid() }))
+  listByParty: publicProcedure
+    .input(z.object({ partyId: z.string().uuid() }))
     .query(async ({ input }) => {
       return db
         .select({
@@ -120,7 +138,7 @@ export const ballotsRouter = router({
         .from(ballots)
         .leftJoin(ballotPairs, eq(ballotPairs.ballotId, ballots.id))
         .leftJoin(votes, eq(votes.ballotPairId, ballotPairs.id))
-        .where(eq(ballots.ideaBankId, input.ideaBankId))
+        .where(eq(ballots.partyId, input.partyId))
         .groupBy(ballots.id)
         .orderBy(desc(ballots.createdAt));
     }),

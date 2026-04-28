@@ -1,5 +1,5 @@
 import { db } from "./index";
-import { ideaBanks, ideas, ideaTranslations } from "./schema";
+import { ideaBanks, ideas, ideaTranslations, parties } from "./schema";
 import { eq } from "drizzle-orm";
 
 const BANK_NAME = "Vote Equity — Chicago 2019";
@@ -146,6 +146,12 @@ async function seed() {
     })),
   );
   console.log(`Inserted ${inserted.length} English translations`);
+
+  const [party] = await db
+    .insert(parties)
+    .values({ ideaBankId: bank.id, name: "April 2026 Community Meeting" })
+    .returning();
+  console.log(`Created party: ${party.id}`);
 
   console.log("Done.");
   process.exit(0);

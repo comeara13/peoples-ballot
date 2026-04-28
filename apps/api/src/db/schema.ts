@@ -72,19 +72,47 @@ export const prompts = pgTable(
   ],
 );
 
-export const ballots = pgTable("ballots", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  ideaBankId: uuid("idea_bank_id")
-    .references(() => ideaBanks.id)
-    .notNull(),
-  status: text("status", { enum: ["pending", "in_progress", "submitted"] })
-    .default("pending")
-    .notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  submittedAt: timestamp("submitted_at", { withTimezone: true }),
-});
+// A party is a distinct voting event (e.g. "April Town Hall") within an idea bank.
+// Each party groups 1-N ballots from the same event. Catchup weights are bank-wide across parties.
+export const parties = pgTable(
+  "parties",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ideaBankId: uuid("idea_bank_id")
+      .references(() => ideaBanks.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["active", "closed"] })
+      .default("active")
+      .notNull(),
+    startAt: timestamp("start_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("parties_idea_bank_id_idx").on(t.ideaBankId)],
+);
+
+export const ballots = pgTable(
+  "ballots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    partyId: uuid("party_id")
+      .references(() => parties.id, { onDelete: "cascade" })
+      .notNull(),
+    status: text("status", { enum: ["pending", "in_progress", "submitted"] })
+      .default("pending")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  },
+  (t) => [index("ballots_party_id_idx").on(t.partyId)],
+);
 
 // A ballot_pair is one instance of a prompt being shown in a specific ballot at a specific position.
 // left_idea_id/right_idea_id are denormalized from the prompt with a possible flip for presentation

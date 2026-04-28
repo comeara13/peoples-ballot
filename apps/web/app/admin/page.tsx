@@ -583,61 +583,222 @@ function BallotCard({
   );
 }
 
-// ─── Ballot Section ───────────────────────────────────────────────────────────
+// ─── Party Section (shown on bank detail page) ───────────────────────────────
 
-function BallotSection({ bankId }: { bankId: string }) {
-  const [pairCount, setPairCount] = useState(10);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [generateError, setGenerateError] = useState<string | null>(null);
+const PARTY_STATUS_STYLES: Record<string, string> = {
+  active: "bg-green-100 text-green-700",
+  closed: "bg-gray-100 text-gray-600",
+};
 
-  const { data, refetch } = trpc.ballots.listByBank.useQuery({ ideaBankId: bankId });
+function CreatePartyForm({
+  bankId,
+  onCreated,
+  onCancel,
+}: {
+  bankId: string;
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const create = trpc.parties.create.useMutation({ onSuccess: onCreated });
 
-  const generate = trpc.ballots.generate.useMutation({
-    onSuccess: () => {
-      setGenerateError(null);
-      refetch();
-    },
-    onError: (e) => setGenerateError(e.message),
-  });
+  return (
+    <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 mb-4">
+      <h3 className="text-sm font-semibold text-gray-800 mb-3">New Party</h3>
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Party name (e.g. April Town Hall)…"
+          autoFocus
+          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
+        />
+        {create.error && <p className="text-xs text-red-600">{create.error.message}</p>}
+        <div className="flex gap-2">
+          <button
+            onClick={() => name.trim() && create.mutate({ ideaBankId: bankId, name: name.trim() })}
+            disabled={!name.trim() || create.isPending}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
+          >
+            {create.isPending ? "Creating…" : "Create Party"}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-gray-600 text-xs rounded border border-gray-300 hover:bg-white font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PartySection({ bankId }: { bankId: string }) {
+  const router = useRouter();
+  const { data, isLoading, refetch } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
+  const [showCreate, setShowCreate] = useState(false);
 
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-gray-900">Ballots</h2>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={pairCount}
-            onChange={(e) => setPairCount(Math.max(1, Math.min(50, Number(e.target.value))))}
-            className="w-14 border border-gray-300 rounded px-2 py-1 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500 text-center"
-          />
-          <span className="text-xs text-gray-600">pairs</span>
+        <h2 className="text-base font-semibold text-gray-900">Parties</h2>
+        {!showCreate && (
           <button
-            onClick={() => generate.mutate({ ideaBankId: bankId, pairCount })}
-            disabled={generate.isPending}
-            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 font-medium disabled:opacity-50"
+            onClick={() => setShowCreate(true)}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 font-medium"
           >
-            {generate.isPending ? "Generating…" : "Generate Ballot"}
+            + New Party
           </button>
-        </div>
+        )}
       </div>
 
-      {generateError && (
-        <p className="text-sm text-red-600 mb-3">{generateError}</p>
+      {showCreate && (
+        <CreatePartyForm
+          bankId={bankId}
+          onCreated={() => { setShowCreate(false); refetch(); }}
+          onCancel={() => setShowCreate(false)}
+        />
+      )}
+
+      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
+
+      {!isLoading && !data?.length && (
+        <p className="text-sm text-gray-600">No parties yet.</p>
       )}
 
       {data?.length ? (
         <div className="space-y-2">
-          {data.map((ballot) => (
+          {data.map((party) => (
+            <button
+              key={party.id}
+              onClick={() => router.push(`/admin?bankId=${bankId}&partyId=${party.id}`)}
+              className="w-full text-left border border-gray-200 rounded-lg p-4 bg-white hover:border-blue-400 hover:bg-blue-50 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <span className="font-medium text-gray-900 group-hover:text-blue-700 flex-1">
+                  {party.name}
+                </span>
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${PARTY_STATUS_STYLES[party.status] ?? ""}`}
+                >
+                  {party.status}
+                </span>
+              </div>
+              <div className="flex gap-4 mt-1.5 text-xs text-gray-600">
+                <span>{party.ballotCount} {party.ballotCount === 1 ? "ballot" : "ballots"}</span>
+                <span>{party.voteCount} votes</span>
+                <span>{new Date(party.startAt).toLocaleDateString()}</span>
+                {party.endAt && <span>→ {new Date(party.endAt).toLocaleDateString()}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ─── Party Detail (shown when partyId is in query params) ────────────────────
+
+function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
+  const router = useRouter();
+  const utils = trpc.useUtils();
+  const [pairCount, setPairCount] = useState(10);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery(
+    { partyId },
+  );
+  const { data: parties } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
+  const party = parties?.find((p) => p.id === partyId);
+
+  const generate = trpc.ballots.generate.useMutation({
+    onSuccess: () => { setGenerateError(null); refetchBallots(); },
+    onError: (e) => setGenerateError(e.message),
+  });
+
+  const close = trpc.parties.close.useMutation({
+    onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
+  });
+
+  const isClosed = party?.status === "closed";
+
+  return (
+    <div>
+      <button
+        onClick={() => router.push(`/admin?bankId=${bankId}`)}
+        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-6 group"
+      >
+        <span className="group-hover:-translate-x-0.5 transition-transform">←</span> Back to Bank
+      </button>
+
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold text-gray-900">
+              {party?.name ?? "Party"}
+            </h1>
+            {party && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PARTY_STATUS_STYLES[party.status] ?? ""}`}>
+                {party.status}
+              </span>
+            )}
+          </div>
+          {party && (
+            <p className="text-sm text-gray-600 mt-0.5">
+              Started {new Date(party.startAt).toLocaleString()}
+              {party.endAt && ` · Closed ${new Date(party.endAt).toLocaleString()}`}
+            </p>
+          )}
+        </div>
+        {!isClosed && party && (
+          <button
+            onClick={() => close.mutate({ id: partyId })}
+            disabled={close.isPending}
+            className="px-3 py-1.5 text-red-600 text-xs rounded border border-red-200 hover:bg-red-50 font-medium disabled:opacity-50"
+          >
+            {close.isPending ? "Closing…" : "Close Party"}
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-900">Ballots</h2>
+        {!isClosed && (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={pairCount}
+              onChange={(e) => setPairCount(Math.max(1, Math.min(50, Number(e.target.value))))}
+              className="w-14 border border-gray-300 rounded px-2 py-1 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500 text-center"
+            />
+            <span className="text-xs text-gray-600">pairs</span>
+            <button
+              onClick={() => generate.mutate({ partyId, pairCount })}
+              disabled={generate.isPending}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 font-medium disabled:opacity-50"
+            >
+              {generate.isPending ? "Generating…" : "Generate Ballot"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {generateError && <p className="text-sm text-red-600 mb-3">{generateError}</p>}
+
+      {ballotList?.length ? (
+        <div className="space-y-2">
+          {ballotList.map((ballot) => (
             <BallotCard
               key={ballot.id}
               ballot={ballot}
               expanded={expandedId === ballot.id}
-              onToggle={() =>
-                setExpandedId(expandedId === ballot.id ? null : ballot.id)
-              }
+              onToggle={() => setExpandedId(expandedId === ballot.id ? null : ballot.id)}
             />
           ))}
         </div>
@@ -713,7 +874,7 @@ function BankDetail({ bankId }: { bankId: string }) {
       </div>
 
       <div className="my-8 border-t border-gray-200" />
-      <BallotSection bankId={bankId} />
+      <PartySection bankId={bankId} />
     </div>
   );
 }
@@ -723,11 +884,18 @@ function BankDetail({ bankId }: { bankId: string }) {
 function AdminContent() {
   const searchParams = useSearchParams();
   const bankId = searchParams.get("bankId");
+  const partyId = searchParams.get("partyId");
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl px-4 py-8">
-        {bankId ? <BankDetail bankId={bankId} /> : <BankList />}
+        {bankId && partyId ? (
+          <PartyDetail bankId={bankId} partyId={partyId} />
+        ) : bankId ? (
+          <BankDetail bankId={bankId} />
+        ) : (
+          <BankList />
+        )}
       </div>
     </main>
   );
