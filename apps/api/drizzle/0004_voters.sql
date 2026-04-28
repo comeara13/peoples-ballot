@@ -1,6 +1,3 @@
--- Clear ephemeral test data (all data in this repo is test data)
-TRUNCATE "votes", "ballot_pairs", "ballots", "parties" CASCADE;
---> statement-breakpoint
 CREATE TABLE "voters" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"clerk_user_id" text,
