@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
 import { VoterRegistrationForm } from "@/components/VoterRegistrationForm";
+import { SuggestIdeaSheet } from "@/components/SuggestIdeaSheet";
 
 import type { Selection, BallotState } from "@/types/ballot";
 
@@ -193,6 +194,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   const utils = trpc.useUtils();
   const { data: ballot, isLoading, error } = trpc.ballots.getById.useQuery({ id: ballotId });
   const [state, setState] = useState<BallotState>({});
+  const [sheetOpen, setSheetOpen] = useState(false);
   const submitMutation = trpc.ballots.submit.useMutation({
     onSuccess: () => utils.ballots.getById.invalidate({ id: ballotId }),
   });
@@ -339,8 +341,26 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
           ))}
         </div>
 
+        {!windowClosed && (
+          <div className="border border-gray-200 rounded-lg p-4 bg-white text-center">
+            <p className="text-sm text-gray-600 mb-3">Have an idea of your own?</p>
+            <button
+              onClick={() => setSheetOpen(true)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              Submit Your Own Idea →
+            </button>
+          </div>
+        )}
+
         <WindowFooter party={ballot.party} />
       </div>
+
+      <SuggestIdeaSheet
+        ballotId={ballotId}
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+      />
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg z-10">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">

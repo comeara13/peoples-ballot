@@ -33,6 +33,23 @@ const WINDOW_STATUS_STYLES = {
   closed: "bg-gray-100 text-gray-600",
 } as const;
 
+const SUGGESTION_STATUS_STYLES: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  approved: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-700",
+  merged: "bg-blue-100 text-blue-700",
+};
+
+const GOVT_LEVEL_LABELS: Record<string, string> = {
+  school_board: "School Board",
+  city_town: "City / Town",
+  county: "County",
+  state: "State",
+  federal: "Federal",
+  all: "All",
+  any: "Any",
+};
+
 type Translation = { id: string; ideaId: string; language: string; text: string };
 type Idea = {
   id: string;
@@ -679,6 +696,102 @@ function CreatePartyForm({
   );
 }
 
+// ─── Suggestion display components ───────────────────────────────────────────
+
+type SuggestionRow = {
+  id: string;
+  text: string;
+  governmentLevels: string[] | null;
+  testimonial: string | null;
+  status: string;
+  createdAt: Date | string;
+  voterFirstName: string | null;
+  voterLastName: string | null;
+  partyName?: string | null;
+};
+
+function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
+  const levels = suggestion.governmentLevels ?? [];
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span
+            className={`text-xs font-medium px-2 py-0.5 rounded-full ${SUGGESTION_STATUS_STYLES[suggestion.status] ?? "bg-gray-100 text-gray-600"}`}
+          >
+            {suggestion.status}
+          </span>
+          {suggestion.partyName && (
+            <span className="text-xs text-gray-500 font-medium">{suggestion.partyName}</span>
+          )}
+          {levels.map((lvl) => (
+            <span key={lvl} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+              {GOVT_LEVEL_LABELS[lvl] ?? lvl}
+            </span>
+          ))}
+        </div>
+        <span className="text-xs text-gray-500 shrink-0 font-mono">
+          {new Date(suggestion.createdAt).toLocaleDateString()}
+        </span>
+      </div>
+
+      <p className="text-sm text-gray-800 leading-snug">{suggestion.text}</p>
+
+      {suggestion.testimonial && (
+        <p className="text-xs text-gray-600 italic leading-relaxed border-l-2 border-gray-200 pl-3">
+          {suggestion.testimonial}
+        </p>
+      )}
+
+      {(suggestion.voterFirstName || suggestion.voterLastName) && (
+        <p className="text-xs text-gray-500">
+          Submitted by {suggestion.voterFirstName} {suggestion.voterLastName}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SuggestionsSection({ data, isLoading }: { data: SuggestionRow[] | undefined; isLoading: boolean }) {
+  return (
+    <div className="mt-8">
+      <h2 className="text-base font-semibold text-gray-900 mb-4">
+        Suggested Ideas
+        {data && data.length > 0 && (
+          <span className="ml-2 text-sm font-normal text-gray-500">({data.length})</span>
+        )}
+      </h2>
+
+      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
+
+      {!isLoading && !data?.length && (
+        <p className="text-sm text-gray-600">No suggestions yet.</p>
+      )}
+
+      {data && data.length > 0 && (
+        <div className="space-y-3">
+          {data.map((s) => (
+            <SuggestionCard key={s.id} suggestion={s} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PartySuggestionsSection({ partyId }: { partyId: string }) {
+  const { data, isLoading } = trpc.suggestedIdeas.listByParty.useQuery({ partyId });
+  return <SuggestionsSection data={data} isLoading={isLoading} />;
+}
+
+function BankSuggestionsSection({ ideaBankId }: { ideaBankId: string }) {
+  const { data, isLoading } = trpc.suggestedIdeas.listByBank.useQuery({ ideaBankId });
+  return <SuggestionsSection data={data} isLoading={isLoading} />;
+}
+
+// ─── Party Section (shown on bank detail page) ───────────────────────────────
+
 function PartySection({ bankId }: { bankId: string }) {
   const router = useRouter();
   const { data, isLoading, refetch } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
@@ -931,6 +1044,9 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
       ) : (
         <p className="text-sm text-gray-600">No ballots yet.</p>
       )}
+
+      <div className="my-8 border-t border-gray-200" />
+      <PartySuggestionsSection partyId={partyId} />
     </div>
   );
 }
@@ -1001,6 +1117,9 @@ function BankDetail({ bankId }: { bankId: string }) {
 
       <div className="my-8 border-t border-gray-200" />
       <PartySection bankId={bankId} />
+
+      <div className="my-8 border-t border-gray-200" />
+      <BankSuggestionsSection ideaBankId={bankId} />
     </div>
   );
 }
