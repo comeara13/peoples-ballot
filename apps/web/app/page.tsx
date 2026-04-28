@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
+import { VoterRegistrationForm } from "@/components/VoterRegistrationForm";
+
 import type { Selection, BallotState } from "@/types/ballot";
 
 // ─── Ballot ID entry ──────────────────────────────────────────────────────────
@@ -179,6 +181,16 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   const submitMutation = trpc.ballots.submit.useMutation({
     onSuccess: () => utils.ballots.getById.invalidate({ id: ballotId }),
   });
+
+  // Show registration form if this ballot hasn't been claimed by a voter yet.
+  if (!isLoading && ballot && !ballot.voterId) {
+    return (
+      <VoterRegistrationForm
+        ballotId={ballotId}
+        onSuccess={() => utils.ballots.getById.invalidate({ id: ballotId })}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
