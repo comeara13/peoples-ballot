@@ -1,6 +1,8 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./routers";
 
+const PORT = parseInt(process.env.PORT ?? "3001");
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -8,8 +10,14 @@ const CORS_HEADERS = {
 };
 
 Bun.serve({
-  port: 3001,
+  port: PORT,
   fetch(req) {
+    const { pathname } = new URL(req.url);
+
+    if (pathname === "/health") {
+      return new Response("ok", { status: 200 });
+    }
+
     if (req.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
@@ -27,4 +35,4 @@ Bun.serve({
   },
 });
 
-console.log("API server running on http://localhost:3001");
+console.log(`API server running on port ${PORT}`);

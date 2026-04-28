@@ -1,0 +1,25 @@
+services:
+  # ── tRPC API (Bun) ────────────────────────────────────────────────────────
+  - type: web
+    name: all-our-ideas-api
+    env: node
+    plan: free
+    buildCommand: bun install
+    startCommand: bun run --cwd apps/api db:migrate && bun run --cwd apps/api start
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false   # set manually in Render dashboard → connect Neon URL
+
+  # ── Next.js static export ─────────────────────────────────────────────────
+  - type: web
+    name: all-our-ideas-web
+    env: static
+    plan: free
+    buildCommand: bun install && bun run --cwd apps/web build
+    staticPublishPath: apps/web/out
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false   # set to the deployed API URL, e.g. https://all-our-ideas-api.onrender.com
+      - key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+        sync: false
