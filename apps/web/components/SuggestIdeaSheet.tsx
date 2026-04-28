@@ -102,6 +102,7 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") { resetForm(); onClose(); } };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm is stable; React Compiler handles memoization
   }, [open, onClose]);
 
   if (!open) return null;
