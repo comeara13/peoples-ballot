@@ -3,7 +3,7 @@ services:
   - type: web
     name: all-our-ideas-api
     env: node
-    plan: free
+    plan: starter
     buildCommand: bun install
     startCommand: bun run --cwd apps/api db:migrate && bun run --cwd apps/api start
     healthCheckPath: /health
@@ -15,7 +15,6 @@ services:
   - type: web
     name: all-our-ideas-web
     env: static
-    plan: free
     buildCommand: bun install && bun run --cwd apps/web build
     staticPublishPath: apps/web/out
     envVars:
