@@ -13,6 +13,7 @@ import {
   votes,
 } from "../db/schema";
 import { buildPairWeights, weightedSample } from "../catchup";
+import { checkPartyWindow } from "../partyWindow";
 
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
 
@@ -159,7 +160,12 @@ export const ballotsRouter = router({
         .where(eq(ballotPairs.ballotId, input.id))
         .orderBy(ballotPairs.position);
 
-      if (!pairs.length) return { ...ballot, voteCount: 0, pairs: [] };
+      const [party] = await db
+        .select({ status: parties.status, startAt: parties.startAt, endAt: parties.endAt })
+        .from(parties)
+        .where(eq(parties.id, ballot.partyId));
+
+      if (!pairs.length) return { ...ballot, party: party ?? null, voteCount: 0, pairs: [] };
 
       const ideaIds = [
         ...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId])),
@@ -186,6 +192,7 @@ export const ballotsRouter = router({
 
       return {
         ...ballot,
+        party: party ?? null,
         voteCount: votesList.length,
         pairs: pairs.map((pair) => ({
           ...pair,
@@ -217,6 +224,13 @@ export const ballotsRouter = router({
       if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
       if (ballot.status === "submitted")
         throw new TRPCError({ code: "BAD_REQUEST", message: "Ballot already submitted." });
+
+      const [submitParty] = await db.select().from(parties).where(eq(parties.id, ballot.partyId));
+      if (submitParty) {
+        const result = checkPartyWindow(submitParty);
+        if (!result.ok)
+          throw new TRPCError({ code: "BAD_REQUEST", message: result.message });
+      }
 
       const pairs = await db
         .select()

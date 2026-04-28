@@ -12,6 +12,7 @@ export const partiesRouter = router({
         ideaBankId: z.string().uuid(),
         name: z.string().min(1).max(200),
         startAt: z.string().datetime().optional(),
+        endAt: z.string().datetime().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -21,9 +22,38 @@ export const partiesRouter = router({
           ideaBankId: input.ideaBankId,
           name: input.name,
           startAt: input.startAt ? new Date(input.startAt) : new Date(),
+          endAt: input.endAt ? new Date(input.endAt) : undefined,
         })
         .returning();
       return party;
+    }),
+
+  update: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().min(1).max(200).optional(),
+        startAt: z.string().datetime().optional(),
+        endAt: z.string().datetime().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const [existing] = await db.select().from(parties).where(eq(parties.id, input.id));
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+      if (existing.status === "closed")
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot edit a closed party." });
+
+      const [updated] = await db
+        .update(parties)
+        .set({
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.startAt !== undefined && { startAt: new Date(input.startAt) }),
+          ...(input.endAt !== undefined && { endAt: input.endAt ? new Date(input.endAt) : null }),
+        })
+        .where(eq(parties.id, input.id))
+        .returning();
+
+      return updated;
     }),
 
   listByBank: publicProcedure

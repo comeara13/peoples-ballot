@@ -7,6 +7,28 @@ import { trpc } from "@/lib/trpc";
 const LANGUAGES = ["en", "es", "fr", "pt", "zh"] as const;
 type Language = (typeof LANGUAGES)[number];
 
+function toDatetimeLocal(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = new Date(date);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function windowStatus(party: { startAt: Date | string; endAt: Date | string | null; status: string }) {
+  if (party.status === "closed") return "closed" as const;
+  const now = new Date();
+  if (now < new Date(party.startAt)) return "scheduled" as const;
+  if (party.endAt && now > new Date(party.endAt)) return "ended" as const;
+  return "open" as const;
+}
+
+const WINDOW_STATUS_STYLES = {
+  open: "bg-green-100 text-green-700",
+  scheduled: "bg-amber-100 text-amber-700",
+  ended: "bg-gray-100 text-gray-600",
+  closed: "bg-gray-100 text-gray-600",
+} as const;
+
 type Translation = { id: string; ideaId: string; language: string; text: string };
 type Idea = {
   id: string;
@@ -600,7 +622,19 @@ function CreatePartyForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
   const create = trpc.parties.create.useMutation({ onSuccess: onCreated });
+
+  function handleCreate() {
+    if (!name.trim()) return;
+    create.mutate({
+      ideaBankId: bankId,
+      name: name.trim(),
+      startAt: startAt ? new Date(startAt).toISOString() : undefined,
+      endAt: endAt ? new Date(endAt).toISOString() : undefined,
+    });
+  }
 
   return (
     <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 mb-4">
@@ -614,10 +648,30 @@ function CreatePartyForm({
           autoFocus
           className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
         />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs text-gray-600 mb-0.5">Opens (optional)</label>
+            <input
+              type="datetime-local"
+              value={startAt}
+              onChange={(e) => setStartAt(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-0.5">Closes (optional)</label>
+            <input
+              type="datetime-local"
+              value={endAt}
+              onChange={(e) => setEndAt(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
         {create.error && <p className="text-xs text-red-600">{create.error.message}</p>}
         <div className="flex gap-2">
           <button
-            onClick={() => name.trim() && create.mutate({ ideaBankId: bankId, name: name.trim() })}
+            onClick={handleCreate}
             disabled={!name.trim() || create.isPending}
             className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
           >
@@ -708,12 +762,17 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
   const [pairCount, setPairCount] = useState(10);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [startAtOverride, setStartAtOverride] = useState<string | null>(null);
+  const [endAtOverride, setEndAtOverride] = useState<string | null>(null);
 
   const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery(
     { partyId },
   );
-  const { data: parties } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
-  const party = parties?.find((p) => p.id === partyId);
+  const { data: partiesList } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
+  const party = partiesList?.find((p) => p.id === partyId);
+
+  const windowStartAt = startAtOverride ?? toDatetimeLocal(party?.startAt);
+  const windowEndAt = endAtOverride ?? toDatetimeLocal(party?.endAt);
 
   const generate = trpc.ballots.generate.useMutation({
     onSuccess: () => { setGenerateError(null); refetchBallots(); },
@@ -724,7 +783,27 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
     onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
   });
 
+  const update = trpc.parties.update.useMutation({
+    onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
+  });
+
   const isClosed = party?.status === "closed";
+  const windowDirty =
+    party &&
+    (startAtOverride !== null || endAtOverride !== null) &&
+    (toDatetimeLocal(party.startAt) !== windowStartAt ||
+      toDatetimeLocal(party.endAt) !== windowEndAt);
+
+  function saveWindow() {
+    if (!party) return;
+    update.mutate({
+      id: partyId,
+      startAt: windowStartAt ? new Date(windowStartAt).toISOString() : undefined,
+      endAt: windowEndAt ? new Date(windowEndAt).toISOString() : null,
+    });
+  }
+
+  const currentWindowStatus = party ? windowStatus(party) : null;
 
   return (
     <div>
@@ -735,7 +814,7 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
         <span className="group-hover:-translate-x-0.5 transition-transform">←</span> Back to Bank
       </button>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold text-gray-900">
@@ -746,13 +825,12 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
                 {party.status}
               </span>
             )}
+            {currentWindowStatus && currentWindowStatus !== "closed" && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${WINDOW_STATUS_STYLES[currentWindowStatus]}`}>
+                {currentWindowStatus === "open" ? "voting open" : currentWindowStatus === "scheduled" ? "scheduled" : "voting ended"}
+              </span>
+            )}
           </div>
-          {party && (
-            <p className="text-sm text-gray-600 mt-0.5">
-              Started {new Date(party.startAt).toLocaleString()}
-              {party.endAt && ` · Closed ${new Date(party.endAt).toLocaleString()}`}
-            </p>
-          )}
         </div>
         {!isClosed && party && (
           <button
@@ -764,6 +842,52 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
           </button>
         )}
       </div>
+
+      {/* Voting window editor */}
+      {party && (
+        <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+          <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Voting Window</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Opens</label>
+              <input
+                type="datetime-local"
+                value={windowStartAt}
+                onChange={(e) => setStartAtOverride(e.target.value)}
+                disabled={isClosed}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Closes (optional)</label>
+              <input
+                type="datetime-local"
+                value={windowEndAt}
+                onChange={(e) => setEndAtOverride(e.target.value)}
+                disabled={isClosed}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+              />
+            </div>
+          </div>
+          {!isClosed && (
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                onClick={saveWindow}
+                disabled={!windowDirty || update.isPending}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+              >
+                {update.isPending ? "Saving…" : "Save Window"}
+              </button>
+              {update.isSuccess && !windowDirty && (
+                <span className="text-xs text-green-600">Saved</span>
+              )}
+              {update.error && (
+                <span className="text-xs text-red-600">{update.error.message}</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-900">Ballots</h2>

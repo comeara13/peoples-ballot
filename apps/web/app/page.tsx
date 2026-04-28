@@ -50,6 +50,63 @@ function BallotEntry() {
   );
 }
 
+// ─── Party window helpers ─────────────────────────────────────────────────────
+
+type WindowState = "open" | "scheduled" | "ended" | "closed";
+
+function getWindowState(party: {
+  status: string;
+  startAt: Date | string;
+  endAt: Date | string | null;
+} | null | undefined): WindowState {
+  if (!party) return "open";
+  if (party.status === "closed") return "closed";
+  const now = new Date();
+  if (now < new Date(party.startAt)) return "scheduled";
+  if (party.endAt && now > new Date(party.endAt)) return "ended";
+  return "open";
+}
+
+function WindowBanner({ party }: { party: { status: string; startAt: Date | string; endAt: Date | string | null } | null | undefined }) {
+  const state = getWindowState(party);
+  if (state === "open") return null;
+
+  const message =
+    state === "closed"
+      ? "This voting session is closed."
+      : state === "scheduled"
+        ? `Voting opens ${new Date(party!.startAt).toLocaleString()}.`
+        : `Voting ended ${new Date(party!.endAt!).toLocaleString()}.`;
+
+  const styles =
+    state === "scheduled"
+      ? "bg-amber-50 border-amber-200 text-amber-800"
+      : "bg-gray-50 border-gray-200 text-gray-700";
+
+  return (
+    <div className={`border rounded-lg px-4 py-3 text-sm font-medium ${styles}`}>
+      {message} This ballot cannot be submitted.
+    </div>
+  );
+}
+
+function WindowFooter({ party }: { party: { status: string; startAt: Date | string; endAt: Date | string | null } | null | undefined }) {
+  if (!party) return null;
+  const state = getWindowState(party);
+  if (state === "closed" || state === "ended") return null;
+
+  if (!party.endAt) return null; // no end time = no footer needed
+
+  return (
+    <div className="text-center text-xs text-gray-500 pb-4">
+      Voting open{" "}
+      {state === "scheduled"
+        ? `from ${new Date(party.startAt).toLocaleString()} to ${new Date(party.endAt!).toLocaleString()}`
+        : `until ${new Date(party.endAt!).toLocaleString()}`}
+    </div>
+  );
+}
+
 // ─── Read-only results view ───────────────────────────────────────────────────
 
 type BallotPairWithVote = {
@@ -191,6 +248,9 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   }
 
   // Voting UI
+  const windowState = getWindowState(ballot.party);
+  const windowClosed = windowState !== "open";
+
   const pairs = ballot.pairs.map((p) => ({
     id: p.id,
     left: { id: p.leftIdeaId, text: p.leftText },
@@ -202,6 +262,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   const allAnswered = answered === total;
 
   function handleSelect(pairId: string, selection: Selection) {
+    if (windowClosed) return;
     setState((prev) => ({ ...prev, [pairId]: selection }));
   }
 
@@ -231,20 +292,26 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4">
-        {pairs.map((pair, index) => (
-          <div key={pair.id}>
-            <PairCard
-              pair={pair}
-              index={index}
-              selection={state[pair.id]}
-              onSelect={handleSelect}
-            />
-            {index < pairs.length - 1 && (
-              <div className="border-t border-dashed border-gray-300" />
-            )}
-          </div>
-        ))}
+      <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+        <WindowBanner party={ballot.party} />
+
+        <div className={windowClosed ? "opacity-50 pointer-events-none select-none" : ""}>
+          {pairs.map((pair, index) => (
+            <div key={pair.id}>
+              <PairCard
+                pair={pair}
+                index={index}
+                selection={state[pair.id]}
+                onSelect={handleSelect}
+              />
+              {index < pairs.length - 1 && (
+                <div className="border-t border-dashed border-gray-300" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <WindowFooter party={ballot.party} />
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg z-10">
@@ -253,7 +320,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
             <span className="font-semibold text-gray-900">{answered}</span>
             {" / "}
             {total} answered
-            {!allAnswered && (
+            {!allAnswered && !windowClosed && (
               <span className="ml-2 text-amber-600 text-xs">
                 ({total - answered} remaining)
               </span>
@@ -261,7 +328,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
           </div>
           <button
             onClick={handleSubmit}
-            disabled={!allAnswered || submitMutation.isPending}
+            disabled={!allAnswered || submitMutation.isPending || windowClosed}
             className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors"
           >
             {submitMutation.isPending ? "Submitting…" : "Submit Ballot"}
