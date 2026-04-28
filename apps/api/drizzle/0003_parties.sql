@@ -1,8 +1,3 @@
--- Wipe vote-dependent tables (dev data — intentional, approved)
-TRUNCATE "votes" CASCADE;
-TRUNCATE "ballot_pairs" CASCADE;
-TRUNCATE "ballots" CASCADE;
---> statement-breakpoint
 CREATE TABLE "parties" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"idea_bank_id" uuid NOT NULL,
