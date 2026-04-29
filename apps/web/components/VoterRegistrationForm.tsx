@@ -32,8 +32,11 @@ const schema = z.object({
   email: z.string().email("Invalid email address"),
   addressStreet: z.string().min(1, "Street address is required"),
   addressCity: z.string().min(1, "City is required"),
-  addressState: z.string().length(2, "Enter 2-letter state code (e.g. IN)"),
-  addressZip: z.string().regex(/^\d{5}$/, "Enter a 5-digit ZIP code"),
+  addressState: z.string().trim().toUpperCase().length(2, "Enter 2-letter state code (e.g. IN)"),
+  addressZip: z
+    .string()
+    .transform((v) => v.replace(/-\d{4}$/, ""))
+    .pipe(z.string().regex(/^\d{5}$/, "Enter a 5-digit ZIP code")),
   raceEthnicityCategories: z
     .array(z.enum(RACE_ETHNICITY_VALUES))
     .min(1, "Please select at least one option")
@@ -237,7 +240,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                   }}
                   id="addressStreet"
                   placeholder="Street address"
-                  autoComplete="off"
+                  autoComplete="new-password"
                   aria-describedby={errors.addressStreet ? "addressStreet-error" : undefined}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -249,7 +252,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
               </div>
               {/* City */}
               <div>
-                <label htmlFor="addressCity" className="sr-only">
+                <label htmlFor="addressCity" className="block text-xs font-medium text-gray-600 mb-1">
                   City
                 </label>
                 <input
@@ -268,13 +271,13 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
               {/* State + ZIP */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="addressState" className="sr-only">
+                  <label htmlFor="addressState" className="block text-xs font-medium text-gray-600 mb-1">
                     State
                   </label>
                   <input
                     {...register("addressState")}
                     id="addressState"
-                    placeholder="State (e.g. IN)"
+                    placeholder="e.g. IN"
                     maxLength={2}
                     aria-describedby={errors.addressState ? "addressState-error" : undefined}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -286,14 +289,14 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                   )}
                 </div>
                 <div>
-                  <label htmlFor="addressZip" className="sr-only">
+                  <label htmlFor="addressZip" className="block text-xs font-medium text-gray-600 mb-1">
                     ZIP code
                   </label>
                   <input
                     {...register("addressZip")}
                     id="addressZip"
                     placeholder="ZIP code"
-                    maxLength={5}
+                    maxLength={10}
                     inputMode="numeric"
                     aria-describedby={errors.addressZip ? "addressZip-error" : undefined}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
