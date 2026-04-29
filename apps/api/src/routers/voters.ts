@@ -17,14 +17,14 @@ const registerInput = z.object({
   ballotId: z.string().uuid(),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  email: z.string().email().optional(),
-  addressStreet: z.string().optional(),
-  addressCity: z.string().optional(),
-  addressState: z.string().length(2).toUpperCase().optional(),
+  email: z.string().email(),
+  addressStreet: z.string().min(1),
+  addressCity: z.string().min(1),
+  addressState: z.string().trim().toUpperCase().length(2),
   addressZip: z
     .string()
-    .regex(/^\d{5}$/)
-    .optional(),
+    .transform((v) => v.replace(/-\d{4}$/, ""))
+    .pipe(z.string().regex(/^\d{5}$/)),
   raceEthnicityCategories: z
     .array(z.enum(RACE_ETHNICITY_CATEGORIES))
     .min(1)

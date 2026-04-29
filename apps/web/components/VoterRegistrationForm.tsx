@@ -29,11 +29,11 @@ const RACE_ETHNICITY_VALUES = RACE_ETHNICITY_OPTIONS.map((o) => o.value) as [
 const schema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
-  email: z.string().email("Invalid email address").or(z.literal("")).optional(),
-  addressStreet: z.string().optional(),
-  addressCity: z.string().optional(),
-  addressState: z.string().optional(),
-  addressZip: z.string().optional(),
+  email: z.string().email("Invalid email address"),
+  addressStreet: z.string().min(1, "Street address is required"),
+  addressCity: z.string().min(1, "City is required"),
+  addressState: z.string().length(2, "Enter 2-letter state code (e.g. IN)"),
+  addressZip: z.string().regex(/^\d{5}$/, "Enter a 5-digit ZIP code"),
   raceEthnicityCategories: z
     .array(z.enum(RACE_ETHNICITY_VALUES))
     .min(1, "Please select at least one option")
@@ -54,7 +54,7 @@ interface VoterRegistrationFormProps {
 }
 
 export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistrationFormProps) {
-  const addressInputRef = useRef<HTMLInputElement>(null);
+  const addressInputRef = useRef<HTMLInputElement | null>(null);
   const { data: affiliationsList, isLoading: affiliationsLoading } =
     trpc.voters.listAffiliations.useQuery();
 
@@ -111,15 +111,14 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
             if (type === "route") route = component.long_name;
             if (type === "locality") city = component.long_name;
             if (type === "administrative_area_level_1") state = component.short_name;
-            if (type === "postal_code") zip = component.long_name;
+            if (type === "postal_code") zip = component.short_name;
           }
 
           const street = [streetNumber, route].filter(Boolean).join(" ");
-          setValue("addressStreet", street);
-          setValue("addressCity", city);
-          setValue("addressState", state);
-          setValue("addressZip", zip);
-          inputEl.value = street;
+          setValue("addressStreet", street, { shouldValidate: true });
+          setValue("addressCity", city, { shouldValidate: true });
+          setValue("addressState", state, { shouldValidate: true });
+          setValue("addressZip", zip, { shouldValidate: true });
         });
       })
       .catch(() => {
@@ -138,7 +137,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
       ballotId,
       firstName: values.firstName,
       lastName: values.lastName,
-      email: values.email || undefined,
+      email: values.email,
       addressStreet: values.addressStreet,
       addressCity: values.addressCity,
       addressState: values.addressState,
@@ -204,35 +203,110 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-              Email <span className="font-normal text-gray-500">(optional)</span>
+              Email
             </label>
             <input
               {...register("email")}
               id="email"
               type="email"
               placeholder="you@example.com"
+              aria-describedby={errors.email ? "email-error" : undefined}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
+            {errors.email && (
+              <p id="email-error" className="text-xs text-red-600 mt-1">
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
           {/* Address */}
-          <div>
-            <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
-              Address <span className="font-normal text-gray-500">(optional)</span>
-            </label>
-            <input
-              ref={addressInputRef}
-              id="address"
-              placeholder="Start typing your address…"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {/* Hidden structured fields populated by Places Autocomplete */}
-            <input type="hidden" {...register("addressStreet")} />
-            <input type="hidden" {...register("addressCity")} />
-            <input type="hidden" {...register("addressState")} />
-            <input type="hidden" {...register("addressZip")} />
-          </div>
+          <fieldset>
+            <legend className="block text-sm font-semibold text-gray-700 mb-3">Address</legend>
+            <div className="space-y-3">
+              {/* Street — autocomplete trigger */}
+              <div>
+                <label htmlFor="addressStreet" className="sr-only">
+                  Street address
+                </label>
+                <input
+                  {...register("addressStreet")}
+                  ref={(el) => {
+                    register("addressStreet").ref(el);
+                    addressInputRef.current = el;
+                  }}
+                  id="addressStreet"
+                  placeholder="Street address"
+                  autoComplete="off"
+                  aria-describedby={errors.addressStreet ? "addressStreet-error" : undefined}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.addressStreet && (
+                  <p id="addressStreet-error" className="text-xs text-red-600 mt-1">
+                    {errors.addressStreet.message}
+                  </p>
+                )}
+              </div>
+              {/* City */}
+              <div>
+                <label htmlFor="addressCity" className="sr-only">
+                  City
+                </label>
+                <input
+                  {...register("addressCity")}
+                  id="addressCity"
+                  placeholder="City"
+                  aria-describedby={errors.addressCity ? "addressCity-error" : undefined}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {errors.addressCity && (
+                  <p id="addressCity-error" className="text-xs text-red-600 mt-1">
+                    {errors.addressCity.message}
+                  </p>
+                )}
+              </div>
+              {/* State + ZIP */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="addressState" className="sr-only">
+                    State
+                  </label>
+                  <input
+                    {...register("addressState")}
+                    id="addressState"
+                    placeholder="State (e.g. IN)"
+                    maxLength={2}
+                    aria-describedby={errors.addressState ? "addressState-error" : undefined}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {errors.addressState && (
+                    <p id="addressState-error" className="text-xs text-red-600 mt-1">
+                      {errors.addressState.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor="addressZip" className="sr-only">
+                    ZIP code
+                  </label>
+                  <input
+                    {...register("addressZip")}
+                    id="addressZip"
+                    placeholder="ZIP code"
+                    maxLength={5}
+                    inputMode="numeric"
+                    aria-describedby={errors.addressZip ? "addressZip-error" : undefined}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {errors.addressZip && (
+                    <p id="addressZip-error" className="text-xs text-red-600 mt-1">
+                      {errors.addressZip.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </fieldset>
 
           {/* Race / Ethnicity */}
           <fieldset>
