@@ -118,10 +118,10 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
           }
 
           const street = [streetNumber, route].filter(Boolean).join(" ");
-          setValue("addressStreet", street, { shouldValidate: true });
-          setValue("addressCity", city, { shouldValidate: true });
-          setValue("addressState", state, { shouldValidate: true });
-          setValue("addressZip", zip, { shouldValidate: true });
+          setValue("addressStreet", street, { shouldDirty: true });
+          setValue("addressCity", city, { shouldDirty: true });
+          setValue("addressState", state, { shouldDirty: true });
+          setValue("addressZip", zip, { shouldDirty: true });
         });
       })
       .catch(() => {
@@ -229,7 +229,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
             <div className="space-y-3">
               {/* Street — autocomplete trigger */}
               <div>
-                <label htmlFor="addressStreet" className="sr-only">
+                <label htmlFor="addressStreet" className="block text-xs font-medium text-gray-600 mb-1">
                   Street address
                 </label>
                 <input
@@ -239,8 +239,8 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                     addressInputRef.current = el;
                   }}
                   id="addressStreet"
-                  placeholder="Street address"
-                  autoComplete="new-password"
+                  placeholder="123 Main St"
+                  autoComplete="off"
                   aria-describedby={errors.addressStreet ? "addressStreet-error" : undefined}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -296,7 +296,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                     {...register("addressZip")}
                     id="addressZip"
                     placeholder="ZIP code"
-                    maxLength={10}
+                    maxLength={5}
                     inputMode="numeric"
                     aria-describedby={errors.addressZip ? "addressZip-error" : undefined}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
