@@ -60,12 +60,17 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   const addressInputRef = useRef<HTMLInputElement | null>(null);
   const { data: affiliationsList, isLoading: affiliationsLoading } =
     trpc.affiliations.listForBallot.useQuery({ ballotId });
+  const { data: assessmentQuestions } = trpc.assessment.listQuestionsForBallot.useQuery({
+    ballotId,
+  });
 
   const registerMutation = trpc.voters.register.useMutation({
     onSuccess: () => onSuccess(),
   });
 
   const [notConnected, setNotConnected] = useState(false);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<string, string>>({});
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
 
   const {
     register,
@@ -138,6 +143,15 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   }, [setValue]);
 
   async function onSubmit(values: FormValues) {
+    if (assessmentQuestions && assessmentQuestions.length > 0) {
+      const unanswered = assessmentQuestions.some((q) => !assessmentAnswers[q.id]);
+      if (unanswered) {
+        setAssessmentError("Please answer all questions before continuing.");
+        return;
+      }
+    }
+    setAssessmentError(null);
+
     await registerMutation.mutateAsync({
       ballotId,
       firstName: values.firstName,
@@ -150,6 +164,10 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
       raceEthnicityCategories: values.raceEthnicityCategories,
       affiliationIds: values.affiliationIds,
       consentedAt: new Date().toISOString(),
+      assessmentResponses: Object.entries(assessmentAnswers).map(([questionId, value]) => ({
+        questionId,
+        value,
+      })),
     });
   }
 
@@ -403,6 +421,85 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                 )}
               />
             </fieldset>
+          )}
+
+          {/* Pre-Assessment — hidden if campaign has no questions */}
+          {assessmentQuestions && assessmentQuestions.length > 0 && (
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">A few quick questions</h3>
+              <p className="text-xs text-gray-500 mb-5">
+                Share your perspective before heading to the ballot.
+              </p>
+              <div className="space-y-6">
+                {assessmentQuestions.map((q) => (
+                  <fieldset key={q.id}>
+                    <legend className="text-sm text-gray-800 mb-3 font-medium leading-snug">
+                      {q.text}
+                    </legend>
+                    {q.type === "likert" ? (
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
+                          <span>Strongly Disagree</span>
+                          <span>Strongly Agree</span>
+                        </div>
+                        <div className="flex gap-2" role="group">
+                          {["1", "2", "3", "4", "5"].map((val) => {
+                            const selected = assessmentAnswers[q.id] === val;
+                            return (
+                              <button
+                                key={val}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                onClick={() => {
+                                  setAssessmentAnswers((prev) => ({ ...prev, [q.id]: val }));
+                                  setAssessmentError(null);
+                                }}
+                                className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                  selected
+                                    ? "bg-blue-600 border-blue-600 text-white"
+                                    : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                                }`}
+                              >
+                                {val}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-3" role="group">
+                        {["yes", "no"].map((val) => {
+                          const selected = assessmentAnswers[q.id] === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => {
+                                setAssessmentAnswers((prev) => ({ ...prev, [q.id]: val }));
+                                setAssessmentError(null);
+                              }}
+                              className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 capitalize ${
+                                selected
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                              }`}
+                            >
+                              {val}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </fieldset>
+                ))}
+              </div>
+              {assessmentError && (
+                <p className="text-xs text-red-600 mt-4">{assessmentError}</p>
+              )}
+            </div>
           )}
 
           {/* Consent */}
