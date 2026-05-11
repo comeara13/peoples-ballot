@@ -56,7 +56,7 @@ interface VoterRegistrationFormProps {
 export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistrationFormProps) {
   const addressInputRef = useRef<HTMLInputElement>(null);
   const { data: affiliationsList, isLoading: affiliationsLoading } =
-    trpc.voters.listAffiliations.useQuery();
+    trpc.affiliations.listForBallot.useQuery({ ballotId });
 
   const registerMutation = trpc.voters.register.useMutation({
     onSuccess: () => onSuccess(),
@@ -276,21 +276,20 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
             )}
           </fieldset>
 
-          {/* Political Affiliation */}
-          <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-1">
-              Political Affiliation <span className="font-normal text-gray-500">(optional)</span>
-            </legend>
-            <p className="text-xs text-gray-500 mb-3">Select all that apply.</p>
-            {affiliationsLoading ? (
-              <p className="text-sm text-gray-500">Loading…</p>
-            ) : (
+          {/* Community & Political Groups — hidden if campaign has none configured */}
+          {!affiliationsLoading && (affiliationsList?.length ?? 0) > 0 && (
+            <fieldset>
+              <legend className="text-sm font-semibold text-gray-700 mb-1">
+                Community & Political Groups{" "}
+                <span className="font-normal text-gray-500">(optional)</span>
+              </legend>
+              <p className="text-xs text-gray-500 mb-3">Select all that apply.</p>
               <Controller
                 name="affiliationIds"
                 control={control}
                 render={({ field }) => (
                   <div className="space-y-2">
-                    {(affiliationsList ?? []).map((aff) => (
+                    {affiliationsList!.map((aff) => (
                       <label key={aff.id} className="flex items-center gap-2.5 cursor-pointer">
                         <input
                           type="checkbox"
@@ -311,8 +310,8 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                   </div>
                 )}
               />
-            )}
-          </fieldset>
+            </fieldset>
+          )}
 
           {/* Consent */}
           <div className="border-t border-gray-100 pt-5">

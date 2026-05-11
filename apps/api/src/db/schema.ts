@@ -130,15 +130,20 @@ export const voterRaceEthnicity = pgTable(
   (t) => [primaryKey({ columns: [t.voterId, t.category] })],
 );
 
-// Platform-wide canonical affiliation groups. Seeded at deploy time; campaigns share the same list.
-export const affiliations = pgTable("affiliations", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull().unique(),
-  type: text("type", {
-    enum: ["political_party", "civic_org", "labor_union", "faith_community", "other"],
-  }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+// Per-campaign affiliation groups (e.g. "Working Families Party", "Neighbors United").
+// Admins create these per idea bank; the voter intake form shows only the bank's groups.
+export const affiliations = pgTable(
+  "affiliations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ideaBankId: uuid("idea_bank_id")
+      .references(() => ideaBanks.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("affiliations_idea_bank_id_name_unique").on(t.ideaBankId, t.name)],
+);
 
 // Many-to-many: a voter may belong to multiple affiliation groups.
 export const voterAffiliations = pgTable(
