@@ -137,6 +137,27 @@ cd apps/api && expect -c 'spawn bun run db:generate; expect eof'
 
 **Note:** The `_journal.json` file must be valid JSON (no trailing commas). Linters may add trailing commas — validate with `python3 -c "import json; json.load(open('apps/api/drizzle/meta/_journal.json'))"` before running generate.
 
+## Git authentication
+
+The remote is `https://github.com/comeara13/all-our-ideas.git`. Plain `git push origin` will fail because the shell has no stored credentials. Use the `gh` token embedded in the URL:
+
+```bash
+TOKEN=$(gh auth token --user comeara13)
+git push "https://comeara13:${TOKEN}@github.com/comeara13/all-our-ideas.git" <branch>
+```
+
+Same pattern for `git pull`, `git fetch`, or any other git network command:
+
+```bash
+git fetch "https://comeara13:${TOKEN}@github.com/comeara13/all-our-ideas.git"
+```
+
+For `gh` CLI commands (PR create, view, diff, etc.) set `GITHUB_TOKEN` instead:
+
+```bash
+TOKEN=$(gh auth token --user comeara13) && GITHUB_TOKEN=$TOKEN gh pr view 9 --repo comeara13/all-our-ideas
+```
+
 ## Key constraints
 
 - No paper ballot export (not in MVP or near-term scope)
