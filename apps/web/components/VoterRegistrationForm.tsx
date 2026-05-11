@@ -60,9 +60,8 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   const addressInputRef = useRef<HTMLInputElement | null>(null);
   const { data: affiliationsList, isLoading: affiliationsLoading } =
     trpc.affiliations.listForBallot.useQuery({ ballotId });
-  const { data: assessmentQuestions } = trpc.assessment.listQuestionsForBallot.useQuery({
-    ballotId,
-  });
+  const { data: assessmentQuestions, isLoading: assessmentQuestionsLoading } =
+    trpc.assessment.listQuestionsForBallot.useQuery({ ballotId });
 
   const registerMutation = trpc.voters.register.useMutation({
     onSuccess: () => onSuccess(),
@@ -538,7 +537,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
 
           <button
             type="submit"
-            disabled={isSubmitting || registerMutation.isPending}
+            disabled={isSubmitting || registerMutation.isPending || assessmentQuestionsLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm transition-colors"
           >
             {registerMutation.isPending ? "Registering…" : "Continue to Ballot"}
