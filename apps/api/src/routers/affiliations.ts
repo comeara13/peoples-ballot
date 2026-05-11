@@ -19,26 +19,23 @@ export const affiliationsRouter = router({
   listForBallot: publicProcedure
     .input(z.object({ ballotId: z.string().uuid() }))
     .query(async ({ input }) => {
-      const [ballot] = await db
-        .select({ partyId: ballots.partyId })
+      const [row] = await db
+        .select({ ideaBankId: parties.ideaBankId })
         .from(ballots)
+        .innerJoin(parties, eq(parties.id, ballots.partyId))
         .where(eq(ballots.id, input.ballotId));
 
-      if (!ballot) throw new TRPCError({ code: "NOT_FOUND", message: "Ballot not found." });
-
-      const [party] = await db
-        .select({ ideaBankId: parties.ideaBankId })
-        .from(parties)
-        .where(eq(parties.id, ballot.partyId));
-
-      if (!party) throw new TRPCError({ code: "NOT_FOUND", message: "Party not found." });
+      // No match means ballot doesn't exist or has no party — return empty list.
+      if (!row) return [];
 
       return db
         .select({ id: affiliations.id, name: affiliations.name })
         .from(affiliations)
-        .where(eq(affiliations.ideaBankId, party.ideaBankId))
+        .where(eq(affiliations.ideaBankId, row.ideaBankId))
         .orderBy(asc(affiliations.name));
     }),
+
+  // TODO: restrict create/delete to admin once Clerk auth is wired up.
 
   create: publicProcedure
     .input(z.object({ ideaBankId: z.string().uuid(), name: z.string().min(1).max(200) }))
@@ -62,19 +59,21 @@ export const affiliationsRouter = router({
   delete: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input }) => {
-      const [inUse] = await db
-        .select({ affiliationId: voterAffiliations.affiliationId })
-        .from(voterAffiliations)
-        .where(eq(voterAffiliations.affiliationId, input.id))
-        .limit(1);
+      await db.transaction(async (tx) => {
+        const [inUse] = await tx
+          .select({ affiliationId: voterAffiliations.affiliationId })
+          .from(voterAffiliations)
+          .where(eq(voterAffiliations.affiliationId, input.id))
+          .limit(1);
 
-      if (inUse) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "This group has been selected by voters and can't be deleted.",
-        });
-      }
+        if (inUse) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "This group has been selected by voters and can't be deleted.",
+          });
+        }
 
-      await db.delete(affiliations).where(eq(affiliations.id, input.id));
+        await tx.delete(affiliations).where(eq(affiliations.id, input.id));
+      });
     }),
 });

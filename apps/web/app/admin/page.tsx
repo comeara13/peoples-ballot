@@ -848,6 +848,7 @@ function AffiliationGroupsSection({ ideaBankId }: { ideaBankId: string }) {
                 <button
                   onClick={() => handleDelete(group.id)}
                   disabled={deleteMutation.isPending}
+                  aria-label={`Delete ${group.name}`}
                   className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
                 >
                   Delete

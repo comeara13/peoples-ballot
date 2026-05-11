@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 // Import from zod/v3 subpath — the main "zod" export in 3.25.x resolves to v4 API.
@@ -61,6 +61,8 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   const registerMutation = trpc.voters.register.useMutation({
     onSuccess: () => onSuccess(),
   });
+
+  const [notConnected, setNotConnected] = useState(false);
 
   const {
     register,
@@ -280,7 +282,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
           {!affiliationsLoading && (affiliationsList?.length ?? 0) > 0 && (
             <fieldset>
               <legend className="text-sm font-semibold text-gray-700 mb-1">
-                Community & Political Groups{" "}
+                How did you get connected to the voting party?{" "}
                 <span className="font-normal text-gray-500">(optional)</span>
               </legend>
               <p className="text-xs text-gray-500 mb-3">Select all that apply.</p>
@@ -289,6 +291,18 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                 control={control}
                 render={({ field }) => (
                   <div className="space-y-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notConnected}
+                        onChange={(e) => {
+                          setNotConnected(e.target.checked);
+                          if (e.target.checked) field.onChange([]);
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Not Connected to Groups</span>
+                    </label>
                     {affiliationsList!.map((aff) => (
                       <label key={aff.id} className="flex items-center gap-2.5 cursor-pointer">
                         <input
@@ -297,6 +311,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                           checked={field.value.includes(aff.id)}
                           onChange={(e) => {
                             if (e.target.checked) {
+                              setNotConnected(false);
                               field.onChange([...field.value, aff.id]);
                             } else {
                               field.onChange(field.value.filter((v) => v !== aff.id));
