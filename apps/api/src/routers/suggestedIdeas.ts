@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { desc, eq, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
-import { ballots, parties, suggestedIdeas, voters, suggestionTags, tags } from "../db/schema";
+import { ballots, parties, suggestedIdeas, voters, suggestionTags, tags, suggestionIdeaLinks } from "../db/schema";
 import { checkPartyWindow } from "../partyWindow";
 
 export const suggestedIdeasRouter = router({
@@ -86,7 +86,7 @@ export const suggestedIdeasRouter = router({
         .where(eq(suggestedIdeas.partyId, input.partyId))
         .orderBy(desc(suggestedIdeas.createdAt));
 
-      return attachTagsToSuggestions(rows);
+      return attachLinkCounts(await attachTagsToSuggestions(rows));
     }),
 
   listByBank: publicProcedure
@@ -109,9 +109,25 @@ export const suggestedIdeasRouter = router({
         .where(eq(suggestedIdeas.ideaBankId, input.ideaBankId))
         .orderBy(desc(suggestedIdeas.createdAt));
 
-      return attachTagsToSuggestions(rows);
+      return attachLinkCounts(await attachTagsToSuggestions(rows));
     }),
 });
+
+async function attachLinkCounts<T extends { id: string }>(
+  rows: T[],
+): Promise<(T & { linkedIdeaCount: number })[]> {
+  if (rows.length === 0) return rows.map((r) => ({ ...r, linkedIdeaCount: 0 }));
+
+  const suggestionIds = rows.map((r) => r.id);
+  const linkRows = await db
+    .select({ suggestionId: suggestionIdeaLinks.suggestionId, cnt: count() })
+    .from(suggestionIdeaLinks)
+    .where(inArray(suggestionIdeaLinks.suggestionId, suggestionIds))
+    .groupBy(suggestionIdeaLinks.suggestionId);
+
+  const countMap = new Map(linkRows.map((r) => [r.suggestionId, Number(r.cnt)]));
+  return rows.map((r) => ({ ...r, linkedIdeaCount: countMap.get(r.id) ?? 0 }));
+}
 
 async function attachTagsToSuggestions<T extends { id: string }>(
   rows: T[],

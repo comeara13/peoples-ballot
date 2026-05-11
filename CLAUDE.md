@@ -159,6 +159,10 @@ For `gh` CLI commands (PR create, view, diff, etc.) set `GITHUB_TOKEN` instead:
 GITHUB_TOKEN=$(gh auth token) gh pr view 9 --repo comeara13/all-our-ideas
 ```
 
+## Auth
+
+Clerk is not yet wired up. Every tRPC procedure currently uses `publicProcedure` with no access control. `docs/auth-gates.md` lists every procedure that must be protected before production — consult it when adding new procedures or reviewing existing ones.
+
 ## Key constraints
 
 - No paper ballot export (not in MVP or near-term scope)

@@ -21,6 +21,12 @@ Everything below currently uses `publicProcedure` — no restriction.
 | `affiliations` | `delete` | Anyone can delete affiliations |
 | `assessment` | `createQuestion` | Anyone can add pre-assessment questions |
 | `assessment` | `deleteQuestion` | Anyone can remove assessment questions |
+| `suggestionLinks` | `link` | Anyone can link suggestions to ideas across any bank |
+| `suggestionLinks` | `unlink` | Anyone can remove links across any bank |
+| `suggestionLinks` | `listForIdea` | Exposes voter PII (first/last name) to any caller |
+| `suggestionLinks` | `listForSuggestion` | Admin-only view |
+| `suggestionLinks` | `candidateSuggestions` | Admin-only view |
+| `suggestionLinks` | `candidateIdeas` | Admin-only view |
 
 ## Bank-scoped (require ownership of the idea bank)
 
