@@ -139,23 +139,24 @@ cd apps/api && expect -c 'spawn bun run db:generate; expect eof'
 
 ## Git authentication
 
-The remote is `https://github.com/comeara13/all-our-ideas.git`. Plain `git push origin` will fail because the shell has no stored credentials. Use the `gh` token embedded in the URL:
+The remote is `https://github.com/comeara13/all-our-ideas.git`. Plain `git push origin` will fail because the shell has no stored credentials. Embed the `gh` token directly in the URL:
 
 ```bash
-TOKEN=$(gh auth token --user comeara13)
-git push "https://comeara13:${TOKEN}@github.com/comeara13/all-our-ideas.git" <branch>
+TOKEN=$(gh auth token)
+GH_USER=$(gh api user --jq .login)
+git push "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git" <branch>
 ```
 
 Same pattern for `git pull`, `git fetch`, or any other git network command:
 
 ```bash
-git fetch "https://comeara13:${TOKEN}@github.com/comeara13/all-our-ideas.git"
+git fetch "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git"
 ```
 
 For `gh` CLI commands (PR create, view, diff, etc.) set `GITHUB_TOKEN` instead:
 
 ```bash
-TOKEN=$(gh auth token --user comeara13) && GITHUB_TOKEN=$TOKEN gh pr view 9 --repo comeara13/all-our-ideas
+GITHUB_TOKEN=$(gh auth token) gh pr view 9 --repo comeara13/all-our-ideas
 ```
 
 ## Key constraints
