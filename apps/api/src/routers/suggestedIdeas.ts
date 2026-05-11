@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
-import { ballots, parties, suggestedIdeas, voters, GOVERNMENT_LEVELS } from "../db/schema";
+import { ballots, parties, suggestedIdeas, voters, suggestionTags, tags } from "../db/schema";
 import { checkPartyWindow } from "../partyWindow";
 
 export const suggestedIdeasRouter = router({
@@ -12,7 +12,7 @@ export const suggestedIdeasRouter = router({
       z.object({
         ballotId: z.string().uuid(),
         text: z.string().min(1).max(2000),
-        governmentLevels: z.array(z.enum(GOVERNMENT_LEVELS)).default([]),
+        tagIds: z.array(z.string().uuid()).default([]),
         testimonial: z.string().max(5000).optional(),
       }),
     )
@@ -48,10 +48,15 @@ export const suggestedIdeasRouter = router({
           ideaBankId: party.ideaBankId,
           voterId: ballot.voterId ?? null,
           text: input.text,
-          governmentLevels: input.governmentLevels,
           testimonial: input.testimonial ?? null,
         })
         .returning();
+
+      if (input.tagIds.length > 0) {
+        await db
+          .insert(suggestionTags)
+          .values(input.tagIds.map((tagId) => ({ suggestionId: suggestion.id, tagId })));
+      }
 
       return suggestion;
     }),
@@ -59,11 +64,10 @@ export const suggestedIdeasRouter = router({
   listByParty: publicProcedure
     .input(z.object({ partyId: z.string().uuid() }))
     .query(async ({ input }) => {
-      return db
+      const rows = await db
         .select({
           id: suggestedIdeas.id,
           text: suggestedIdeas.text,
-          governmentLevels: suggestedIdeas.governmentLevels,
           testimonial: suggestedIdeas.testimonial,
           status: suggestedIdeas.status,
           createdAt: suggestedIdeas.createdAt,
@@ -74,16 +78,17 @@ export const suggestedIdeasRouter = router({
         .leftJoin(voters, eq(voters.id, suggestedIdeas.voterId))
         .where(eq(suggestedIdeas.partyId, input.partyId))
         .orderBy(desc(suggestedIdeas.createdAt));
+
+      return attachTagsToSuggestions(rows);
     }),
 
   listByBank: publicProcedure
     .input(z.object({ ideaBankId: z.string().uuid() }))
     .query(async ({ input }) => {
-      return db
+      const rows = await db
         .select({
           id: suggestedIdeas.id,
           text: suggestedIdeas.text,
-          governmentLevels: suggestedIdeas.governmentLevels,
           testimonial: suggestedIdeas.testimonial,
           status: suggestedIdeas.status,
           createdAt: suggestedIdeas.createdAt,
@@ -96,5 +101,29 @@ export const suggestedIdeasRouter = router({
         .leftJoin(voters, eq(voters.id, suggestedIdeas.voterId))
         .where(eq(suggestedIdeas.ideaBankId, input.ideaBankId))
         .orderBy(desc(suggestedIdeas.createdAt));
+
+      return attachTagsToSuggestions(rows);
     }),
 });
+
+async function attachTagsToSuggestions<T extends { id: string }>(
+  rows: T[],
+): Promise<(T & { tags: (typeof tags.$inferSelect)[] })[]> {
+  if (rows.length === 0) return rows.map((r) => ({ ...r, tags: [] }));
+
+  const suggestionIds = rows.map((r) => r.id);
+  const tagRows = await db
+    .select({ suggestionId: suggestionTags.suggestionId, tag: tags })
+    .from(suggestionTags)
+    .innerJoin(tags, eq(tags.id, suggestionTags.tagId))
+    .where(inArray(suggestionTags.suggestionId, suggestionIds));
+
+  const tagMap = new Map<string, (typeof tags.$inferSelect)[]>();
+  for (const { suggestionId, tag } of tagRows) {
+    const list = tagMap.get(suggestionId) ?? [];
+    list.push(tag);
+    tagMap.set(suggestionId, list);
+  }
+
+  return rows.map((r) => ({ ...r, tags: tagMap.get(r.id) ?? [] }));
+}

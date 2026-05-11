@@ -3,7 +3,7 @@ import { eq, count, inArray, or, and, ne } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
-import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes } from "../db/schema";
+import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes, ideaTags, tags } from "../db/schema";
 import { computeScore } from "../scoring";
 
 export const ideaBanksRouter = router({
@@ -40,6 +40,15 @@ export const ideaBanksRouter = router({
     const translations =
       ideaIds.length > 0
         ? await db.select().from(ideaTranslations).where(inArray(ideaTranslations.ideaId, ideaIds))
+        : [];
+
+    const ideaTagRows =
+      ideaIds.length > 0
+        ? await db
+            .select({ ideaId: ideaTags.ideaId, tag: tags })
+            .from(ideaTags)
+            .innerJoin(tags, eq(tags.id, ideaTags.tagId))
+            .where(inArray(ideaTags.ideaId, ideaIds))
         : [];
 
     // Fetch ballot_pairs involving any of this bank's ideas
@@ -96,6 +105,7 @@ export const ideaBanksRouter = router({
             score: computeScore(w, l),
             voteCount: w + l,
             translations: translations.filter((t) => t.ideaId === idea.id),
+            tags: ideaTagRows.filter((r) => r.ideaId === idea.id).map((r) => r.tag),
           };
         })
         .sort((a, b) => b.score - a.score || b.wins - a.wins),
@@ -103,31 +113,21 @@ export const ideaBanksRouter = router({
   }),
 
   createIdea: publicProcedure
-    .input(
-      z.object({
-        ideaBankId: z.string().uuid(),
-        category: z.string().optional(),
-      }),
-    )
+    .input(z.object({ ideaBankId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const [idea] = await db.insert(ideas).values(input).returning();
       return idea;
     }),
 
-  updateIdea: publicProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        category: z.string().nullable(),
-      }),
-    )
+  setIdeaTags: publicProcedure
+    .input(z.object({ ideaId: z.string().uuid(), tagIds: z.array(z.string().uuid()) }))
     .mutation(async ({ input }) => {
-      const [idea] = await db
-        .update(ideas)
-        .set({ category: input.category })
-        .where(eq(ideas.id, input.id))
-        .returning();
-      return idea;
+      await db.delete(ideaTags).where(eq(ideaTags.ideaId, input.ideaId));
+      if (input.tagIds.length > 0) {
+        await db
+          .insert(ideaTags)
+          .values(input.tagIds.map((tagId) => ({ ideaId: input.ideaId, tagId })));
+      }
     }),
 
   upsertTranslation: publicProcedure
