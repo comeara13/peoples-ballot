@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   uuid,
   text,
   boolean,
@@ -242,7 +243,9 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
 // Platform-wide controlled vocabulary of tags. Typed (issue_category | scale).
 // Tags are archived rather than deleted — archived tags remain on existing items
 // but are excluded from pickers for new tagging.
-export const TAG_TYPES = ["issue_category", "scale"] as const;
+export const tagTypeEnum = pgEnum("tag_type", ["issue_category", "scale"]);
+// Derived from the enum so schema and validators stay in sync automatically.
+export const TAG_TYPES = tagTypeEnum.enumValues;
 export type TagType = (typeof TAG_TYPES)[number];
 
 export const tags = pgTable(
@@ -250,7 +253,7 @@ export const tags = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     name: text("name").notNull(),
-    type: text("type", { enum: TAG_TYPES }).notNull(),
+    type: tagTypeEnum("type").notNull(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

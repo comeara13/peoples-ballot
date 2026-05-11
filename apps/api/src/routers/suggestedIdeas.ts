@@ -53,6 +53,13 @@ export const suggestedIdeasRouter = router({
         .returning();
 
       if (input.tagIds.length > 0) {
+        const foundTags = await db
+          .select({ id: tags.id })
+          .from(tags)
+          .where(inArray(tags.id, input.tagIds));
+        if (foundTags.length !== input.tagIds.length) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "One or more tag IDs not found." });
+        }
         await db
           .insert(suggestionTags)
           .values(input.tagIds.map((tagId) => ({ suggestionId: suggestion.id, tagId })));

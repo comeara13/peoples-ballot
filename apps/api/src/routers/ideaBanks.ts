@@ -122,12 +122,14 @@ export const ideaBanksRouter = router({
   setIdeaTags: publicProcedure
     .input(z.object({ ideaId: z.string().uuid(), tagIds: z.array(z.string().uuid()) }))
     .mutation(async ({ input }) => {
-      await db.delete(ideaTags).where(eq(ideaTags.ideaId, input.ideaId));
-      if (input.tagIds.length > 0) {
-        await db
-          .insert(ideaTags)
-          .values(input.tagIds.map((tagId) => ({ ideaId: input.ideaId, tagId })));
-      }
+      await db.transaction(async (tx) => {
+        await tx.delete(ideaTags).where(eq(ideaTags.ideaId, input.ideaId));
+        if (input.tagIds.length > 0) {
+          await tx
+            .insert(ideaTags)
+            .values(input.tagIds.map((tagId) => ({ ideaId: input.ideaId, tagId })));
+        }
+      });
     }),
 
   upsertTranslation: publicProcedure

@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { trpc } from "@/lib/trpc";
+import { trpc, type RouterOutput } from "@/lib/trpc";
 
 const LANGUAGES = ["en", "es", "fr", "pt", "zh"] as const;
 type Language = (typeof LANGUAGES)[number];
@@ -40,13 +40,7 @@ const SUGGESTION_STATUS_STYLES: Record<string, string> = {
   merged: "bg-blue-100 text-blue-700",
 };
 
-type Tag = {
-  id: string;
-  name: string;
-  type: string;
-  archivedAt: Date | string | null;
-  createdAt: Date | string;
-};
+type Tag = RouterOutput["tags"]["list"][number];
 
 const TAG_TYPE_STYLES: Record<string, string> = {
   issue_category: "bg-indigo-100 text-indigo-700",
@@ -380,18 +374,32 @@ function IdeaCard({
             </button>
             {showTagPicker && (
               <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[160px]">
-                {unpickedTags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    onClick={() => addTag(tag.id)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                  >
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full ${tag.type === "issue_category" ? "bg-indigo-400" : "bg-teal-400"}`}
-                    />
-                    {tag.name}
-                  </button>
-                ))}
+                {(
+                  [
+                    { key: "issue_category", label: "Issue Category", dot: "bg-indigo-400" },
+                    { key: "scale", label: "Scale", dot: "bg-teal-400" },
+                  ] as const
+                ).map(({ key, label, dot }) => {
+                  const group = unpickedTags.filter((t) => t.type === key);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={key}>
+                      <p className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        {label}
+                      </p>
+                      {group.map((tag) => (
+                        <button
+                          key={tag.id}
+                          onClick={() => addTag(tag.id)}
+                          className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <span className={`inline-block w-2 h-2 rounded-full ${dot}`} />
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
