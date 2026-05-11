@@ -3,57 +3,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
-const SPECIFIC_LEVELS = ["school_board", "city_town", "county", "state", "federal"] as const;
-
-const LEVEL_LABELS: Record<string, string> = {
-  school_board: "School Board",
-  city_town: "City / Town",
-  county: "County",
-  state: "State",
-  federal: "Federal",
-  all: "All",
-  any: "Any",
-};
-
-type GovernmentLevel =
-  | "school_board"
-  | "city_town"
-  | "county"
-  | "state"
-  | "federal"
-  | "all"
-  | "any";
-
-const ALL_LEVELS: GovernmentLevel[] = [
-  "school_board",
-  "city_town",
-  "county",
-  "state",
-  "federal",
-  "all",
-  "any",
-];
-
-function toggleLevel(current: GovernmentLevel[], level: GovernmentLevel): GovernmentLevel[] {
-  const isSelected = current.includes(level);
-
-  if (level === "all") {
-    // Selecting "all" clears all specific levels; deselecting removes "all"
-    return isSelected ? current.filter((l) => l !== "all") : ["all"];
-  }
-
-  if (SPECIFIC_LEVELS.includes(level as (typeof SPECIFIC_LEVELS)[number])) {
-    // Selecting a specific level removes "all"
-    if (isSelected) {
-      return current.filter((l) => l !== level);
-    }
-    return [...current.filter((l) => l !== "all"), level];
-  }
-
-  // "any" — plain toggle, no auto-clear
-  return isSelected ? current.filter((l) => l !== level) : [...current, level];
-}
-
 interface SuggestIdeaSheetProps {
   ballotId: string;
   open: boolean;
@@ -63,30 +12,36 @@ interface SuggestIdeaSheetProps {
 export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetProps) {
   const [phase, setPhase] = useState<"form" | "success">("form");
   const [text, setText] = useState("");
-  const [levels, setLevels] = useState<GovernmentLevel[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [testimonial, setTestimonial] = useState("");
+
+  const { data: tags = [] } = trpc.tags.list.useQuery(undefined, { enabled: open });
+  const issueCategories = tags.filter((t) => t.type === "issue_category");
+  const scaleTags = tags.filter((t) => t.type === "scale");
 
   const submit = trpc.suggestedIdeas.submit.useMutation({
     onSuccess: () => setPhase("success"),
   });
+
+  function toggleTag(tagId: string) {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId],
+    );
+  }
 
   function handleSubmit() {
     if (!text.trim()) return;
     submit.mutate({
       ballotId,
       text: text.trim(),
-      governmentLevels: levels,
+      tagIds: selectedTagIds,
       testimonial: testimonial.trim() || undefined,
     });
   }
 
-  function handleSubmitAnother() {
-    resetForm();
-  }
-
   function resetForm() {
     setText("");
-    setLevels([]);
+    setSelectedTagIds([]);
     setTestimonial("");
     submit.reset();
     setPhase("form");
@@ -99,10 +54,15 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") { resetForm(); onClose(); } };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        resetForm();
+        onClose();
+      }
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm is stable; React Compiler handles memoization
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm is stable; React Compiler handles memoization
   }, [open, onClose]);
 
   if (!open) return null;
@@ -149,41 +109,76 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                   autoFocus
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
-                <p className="text-xs text-gray-500 mt-1 text-right">
-                  {text.length} / 2000
-                </p>
+                <p className="text-xs text-gray-500 mt-1 text-right">{text.length} / 2000</p>
               </div>
 
-              {/* Government levels */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  Is there a specific level of government you are directing this idea to?
-                </h3>
-                <p className="text-xs text-gray-500 mb-3">Optional — select all that apply.</p>
-                <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-                  {ALL_LEVELS.map((level) => (
-                    <label key={level} className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={levels.includes(level)}
-                        onChange={() => setLevels(toggleLevel(levels, level))}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">{LEVEL_LABELS[level]}</span>
-                    </label>
-                  ))}
+              {/* Tag pickers */}
+              {(issueCategories.length > 0 || scaleTags.length > 0) && (
+                <div className="space-y-4">
+                  {issueCategories.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">Issue Category</h3>
+                      <p className="text-xs text-gray-500 mb-3">Optional — select all that apply.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {issueCategories.map((tag) => {
+                          const selected = selectedTagIds.includes(tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => toggleTag(tag.id)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                                selected
+                                  ? "bg-indigo-600 text-white border-indigo-600"
+                                  : "bg-white text-gray-700 border-gray-300 hover:border-indigo-400"
+                              }`}
+                            >
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {scaleTags.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                        Level of Government
+                      </h3>
+                      <p className="text-xs text-gray-500 mb-3">Optional — select all that apply.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {scaleTags.map((tag) => {
+                          const selected = selectedTagIds.includes(tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => toggleTag(tag.id)}
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                                selected
+                                  ? "bg-teal-600 text-white border-teal-600"
+                                  : "bg-white text-gray-700 border-gray-300 hover:border-teal-400"
+                              }`}
+                            >
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Testimonial */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Testimonial{" "}
-                  <span className="font-normal text-gray-500">(optional)</span>
+                  Testimonial <span className="font-normal text-gray-500">(optional)</span>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
-                  Why did you submit this idea? What is something you would want to share about
-                  why this idea matters to you? Responses will be anonymized.
+                  Why did you submit this idea? What is something you would want to share about why
+                  this idea matters to you? Responses will be anonymized.
                 </p>
                 <textarea
                   value={testimonial}
@@ -193,9 +188,7 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                   rows={4}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
-                <p className="text-xs text-gray-500 mt-1 text-right">
-                  {testimonial.length} / 5000
-                </p>
+                <p className="text-xs text-gray-500 mt-1 text-right">{testimonial.length} / 5000</p>
               </div>
 
               {/* Review note */}
@@ -205,9 +198,7 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                 ideas will be merged.
               </p>
 
-              {submit.error && (
-                <p className="text-xs text-red-600">{submit.error.message}</p>
-              )}
+              {submit.error && <p className="text-xs text-red-600">{submit.error.message}</p>}
 
               {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-3">
@@ -234,14 +225,14 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                   <h2 className="text-lg font-semibold text-gray-900">Idea Submitted</h2>
                 </div>
                 <p className="text-sm text-gray-600">
-                  Your idea has been submitted for review. The committee will approve and
-                  translate it within 48 hours.
+                  Your idea has been submitted for review. The committee will approve and translate
+                  it within 48 hours.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={handleSubmitAnother}
+                  onClick={resetForm}
                   className="flex-1 border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium py-2.5 rounded-lg text-sm transition-colors"
                 >
                   Submit Another Idea

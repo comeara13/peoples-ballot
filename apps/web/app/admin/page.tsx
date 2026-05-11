@@ -40,20 +40,22 @@ const SUGGESTION_STATUS_STYLES: Record<string, string> = {
   merged: "bg-blue-100 text-blue-700",
 };
 
-const GOVT_LEVEL_LABELS: Record<string, string> = {
-  school_board: "School Board",
-  city_town: "City / Town",
-  county: "County",
-  state: "State",
-  federal: "Federal",
-  all: "All",
-  any: "Any",
+type Tag = {
+  id: string;
+  name: string;
+  type: string;
+  archivedAt: Date | string | null;
+  createdAt: Date | string;
+};
+
+const TAG_TYPE_STYLES: Record<string, string> = {
+  issue_category: "bg-indigo-100 text-indigo-700",
+  scale: "bg-teal-100 text-teal-700",
 };
 
 type Translation = { id: string; ideaId: string; language: string; text: string };
 type Idea = {
   id: string;
-  category: string | null;
   isActive: boolean;
   wins: number;
   losses: number;
@@ -61,6 +63,7 @@ type Idea = {
   voteCount: number;
   createdAt: Date | string;
   translations: Translation[];
+  tags: Tag[];
 };
 
 // ─── Create Bank Form ─────────────────────────────────────────────────────────
@@ -297,42 +300,41 @@ function AddTranslationForm({
 
 function IdeaCard({
   idea,
-  onUpdateCategory,
+  availableTags,
+  onSetTags,
   onUpsertTranslation,
 }: {
   idea: Idea;
-  onUpdateCategory: (id: string, category: string | null) => void;
+  availableTags: Tag[];
+  onSetTags: (ideaId: string, tagIds: string[]) => void;
   onUpsertTranslation: (ideaId: string, language: string, text: string) => void;
 }) {
-  const [category, setCategory] = useState(idea.category ?? "");
   const [editingLang, setEditingLang] = useState<string | null>(null);
   const [addingTranslation, setAddingTranslation] = useState(false);
+  const [showTagPicker, setShowTagPicker] = useState(false);
 
-  const handleCategoryBlur = () => {
-    const trimmed = category.trim() || null;
-    if (trimmed !== idea.category) {
-      onUpdateCategory(idea.id, trimmed);
-    }
-  };
+  const currentTagIds = new Set(idea.tags.map((t) => t.id));
+  const unpickedTags = availableTags.filter((t) => !currentTagIds.has(t.id) && !t.archivedAt);
+
+  function removeTag(tagId: string) {
+    onSetTags(idea.id, idea.tags.filter((t) => t.id !== tagId).map((t) => t.id));
+  }
+
+  function addTag(tagId: string) {
+    onSetTags(idea.id, [...idea.tags.map((t) => t.id), tagId]);
+    setShowTagPicker(false);
+  }
 
   const existingLanguages = idea.translations.map((t) => t.language);
   const hasAllLanguages = LANGUAGES.every((l) => existingLanguages.includes(l));
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-white">
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-3 mb-2">
         <span className="font-mono text-xs text-gray-500 shrink-0 select-all">
           {idea.id.slice(0, 8)}
         </span>
-        <input
-          type="text"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          onBlur={handleCategoryBlur}
-          placeholder="No category"
-          className="flex-1 text-sm text-gray-700 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none py-0.5 bg-transparent placeholder:text-gray-500"
-        />
-        <div className="shrink-0 flex flex-col items-end gap-1">
+        <div className="shrink-0 flex flex-col items-end gap-1 ml-auto">
           <div className="flex items-center gap-2">
             <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
               <div
@@ -349,6 +351,51 @@ function IdeaCard({
             {idea.voteCount === 1 ? "vote" : "votes"}
           </span>
         </div>
+      </div>
+
+      {/* Tag chips + picker */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3 relative">
+        {idea.tags.map((tag) => (
+          <span
+            key={tag.id}
+            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${TAG_TYPE_STYLES[tag.type] ?? "bg-gray-100 text-gray-600"}`}
+          >
+            {tag.name}
+            <button
+              onClick={() => removeTag(tag.id)}
+              aria-label={`Remove tag ${tag.name}`}
+              className="hover:opacity-60 leading-none"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {unpickedTags.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowTagPicker((v) => !v)}
+              className="text-xs text-gray-500 hover:text-gray-800 border border-dashed border-gray-300 rounded-full px-2 py-0.5"
+            >
+              + tag
+            </button>
+            {showTagPicker && (
+              <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[160px]">
+                {unpickedTags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => addTag(tag.id)}
+                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${tag.type === "issue_category" ? "bg-indigo-400" : "bg-teal-400"}`}
+                    />
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-0">
@@ -410,7 +457,6 @@ function AddIdeaForm({
   onAdd: () => void;
   onCancel: () => void;
 }) {
-  const [category, setCategory] = useState("");
   const [language, setLanguage] = useState<Language>("en");
   const [text, setText] = useState("");
 
@@ -419,10 +465,7 @@ function AddIdeaForm({
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
-    const idea = await createIdea.mutateAsync({
-      ideaBankId: bankId,
-      category: category.trim() || undefined,
-    });
+    const idea = await createIdea.mutateAsync({ ideaBankId: bankId });
     await upsertTranslation.mutateAsync({
       ideaId: idea.id,
       language,
@@ -437,13 +480,6 @@ function AddIdeaForm({
     <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 mb-4">
       <h3 className="text-sm font-semibold text-gray-800 mb-3">New Idea</h3>
       <div className="space-y-2">
-        <input
-          type="text"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="Category (optional)"
-          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
-        />
         <div className="flex gap-2">
           <select
             value={language}
@@ -701,7 +737,7 @@ function CreatePartyForm({
 type SuggestionRow = {
   id: string;
   text: string;
-  governmentLevels: string[] | null;
+  tags: Tag[];
   testimonial: string | null;
   status: string;
   createdAt: Date | string;
@@ -711,8 +747,6 @@ type SuggestionRow = {
 };
 
 function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
-  const levels = suggestion.governmentLevels ?? [];
-
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-2">
       <div className="flex items-start justify-between gap-3">
@@ -725,9 +759,12 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
           {suggestion.partyName && (
             <span className="text-xs text-gray-500 font-medium">{suggestion.partyName}</span>
           )}
-          {levels.map((lvl) => (
-            <span key={lvl} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-              {GOVT_LEVEL_LABELS[lvl] ?? lvl}
+          {suggestion.tags.map((tag) => (
+            <span
+              key={tag.id}
+              className={`text-xs font-medium px-2 py-0.5 rounded-full ${TAG_TYPE_STYLES[tag.type] ?? "bg-gray-100 text-gray-600"}`}
+            >
+              {tag.name}
             </span>
           ))}
         </div>
@@ -1313,10 +1350,14 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
 
 function BankDetail({ bankId }: { bankId: string }) {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { data, isLoading, error, refetch } = trpc.ideaBanks.getById.useQuery({ id: bankId });
+  const { data: availableTags = [] } = trpc.tags.list.useQuery(undefined);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const updateIdea = trpc.ideaBanks.updateIdea.useMutation();
+  const setIdeaTags = trpc.ideaBanks.setIdeaTags.useMutation({
+    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
+  });
   const upsertTranslation = trpc.ideaBanks.upsertTranslation.useMutation({
     onSuccess: () => refetch(),
   });
@@ -1365,7 +1406,8 @@ function BankDetail({ bankId }: { bankId: string }) {
           <IdeaCard
             key={idea.id}
             idea={idea}
-            onUpdateCategory={(id, category) => updateIdea.mutate({ id, category })}
+            availableTags={availableTags}
+            onSetTags={(ideaId, tagIds) => setIdeaTags.mutate({ ideaId, tagIds })}
             onUpsertTranslation={(ideaId, language, text) =>
               upsertTranslation.mutate({ ideaId, language, text })
             }
@@ -1391,6 +1433,147 @@ function BankDetail({ bankId }: { bankId: string }) {
   );
 }
 
+// ─── Tag Management Section (platform-level) ─────────────────────────────────
+
+function TagManagementSection() {
+  const utils = trpc.useUtils();
+  const { data: allTags, isLoading } = trpc.tags.list.useQuery({ includeArchived: true });
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<"issue_category" | "scale">("issue_category");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const createMutation = trpc.tags.create.useMutation({
+    onSuccess: () => {
+      setNewName("");
+      setAddError(null);
+      utils.tags.list.invalidate();
+    },
+    onError: (err) => setAddError(err.message),
+  });
+  const archiveMutation = trpc.tags.archive.useMutation({
+    onSuccess: () => utils.tags.list.invalidate(),
+  });
+  const unarchiveMutation = trpc.tags.unarchive.useMutation({
+    onSuccess: () => utils.tags.list.invalidate(),
+  });
+
+  const activeTags = allTags?.filter((t) => !t.archivedAt) ?? [];
+  const archivedTags = allTags?.filter((t) => t.archivedAt) ?? [];
+  const issueCategories = activeTags.filter((t) => t.type === "issue_category");
+  const scaleTags = activeTags.filter((t) => t.type === "scale");
+
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-gray-900 mb-1">Tag Vocabulary</h2>
+      <p className="text-xs text-gray-500 mb-4">
+        Platform-wide controlled vocabulary. Tags can be archived but not deleted.
+      </p>
+
+      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
+
+      {!isLoading && (
+        <div className="space-y-4">
+          {[
+            { label: "Issue Categories", tags: issueCategories, type: "issue_category" as const },
+            { label: "Scale", tags: scaleTags, type: "scale" as const },
+          ].map(({ label, tags }) => (
+            <div key={label}>
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                {label}
+              </p>
+              {tags.length === 0 && (
+                <p className="text-xs text-gray-500 italic">None yet.</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className="flex items-center gap-1.5 border border-gray-200 rounded-full pl-3 pr-1.5 py-1 bg-white"
+                  >
+                    <span className="text-xs text-gray-800">{tag.name}</span>
+                    <button
+                      onClick={() => archiveMutation.mutate({ id: tag.id })}
+                      disabled={archiveMutation.isPending}
+                      title="Archive tag"
+                      className="text-gray-400 hover:text-gray-600 text-xs leading-none disabled:opacity-50"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {archivedTags.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowArchived((v) => !v)}
+                className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+              >
+                {showArchived ? "▾" : "▸"} Archived ({archivedTags.length})
+              </button>
+              {showArchived && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {archivedTags.map((tag) => (
+                    <div
+                      key={tag.id}
+                      className="flex items-center gap-1.5 border border-dashed border-gray-200 rounded-full pl-3 pr-1.5 py-1 bg-gray-50"
+                    >
+                      <span className="text-xs text-gray-400 line-through">{tag.name}</span>
+                      <span className="text-xs text-gray-400">({tag.type === "issue_category" ? "cat" : "scale"})</span>
+                      <button
+                        onClick={() => unarchiveMutation.mutate({ id: tag.id })}
+                        disabled={unarchiveMutation.isPending}
+                        title="Restore tag"
+                        className="text-gray-400 hover:text-green-600 text-xs leading-none disabled:opacity-50"
+                      >
+                        ↺
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newName.trim()) createMutation.mutate({ name: newName.trim(), type: newType });
+            }}
+            className="flex gap-2 pt-2"
+          >
+            <input
+              value={newName}
+              onChange={(e) => { setNewName(e.target.value); setAddError(null); }}
+              placeholder="Tag name…"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select
+              value={newType}
+              onChange={(e) => setNewType(e.target.value as "issue_category" | "scale")}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="issue_category">Issue Category</option>
+              <option value="scale">Scale</option>
+            </select>
+            <button
+              type="submit"
+              disabled={!newName.trim() || createMutation.isPending}
+              className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+            >
+              Add
+            </button>
+          </form>
+          {addError && <p className="text-xs text-red-600 mt-1">{addError}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Content (uses useSearchParams) ────────────────────────────────────
 
 function AdminContent() {
@@ -1406,7 +1589,11 @@ function AdminContent() {
         ) : bankId ? (
           <BankDetail bankId={bankId} />
         ) : (
-          <BankList />
+          <>
+            <BankList />
+            <div className="my-8 border-t border-gray-200" />
+            <TagManagementSection />
+          </>
         )}
       </div>
     </main>
