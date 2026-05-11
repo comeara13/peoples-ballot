@@ -5,6 +5,7 @@ import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
 import {
   affiliations,
+  assessmentResponses,
   ballots,
   RACE_ETHNICITY_CATEGORIES,
   voterAffiliations,
@@ -33,6 +34,9 @@ const registerInput = z.object({
     }),
   affiliationIds: z.array(z.string().uuid()),
   consentedAt: z.string().datetime(),
+  assessmentResponses: z.array(
+    z.object({ questionId: z.string().uuid(), value: z.string().min(1) }),
+  ),
 });
 
 export const votersRouter = router({
@@ -82,6 +86,16 @@ export const votersRouter = router({
           input.affiliationIds.map((affiliationId) => ({
             voterId: voter.id,
             affiliationId,
+          })),
+        );
+      }
+
+      if (input.assessmentResponses.length > 0) {
+        await tx.insert(assessmentResponses).values(
+          input.assessmentResponses.map(({ questionId, value }) => ({
+            ballotId: input.ballotId,
+            questionId,
+            value,
           })),
         );
       }
