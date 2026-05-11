@@ -93,7 +93,71 @@ bun run db:generate   # creates SQL file + journal entry
 bun run db:migrate    # applies pending migrations to the local DB
 ```
 
+`db:generate` requires a TTY — run it via `expect` when invoked from a script:
+```bash
+expect -c 'spawn bun run db:generate; expect eof'
+```
+
 Hand-written SQL files will be ignored by `drizzle-kit migrate` because they have no journal entry, leading to silent drift between the schema and the DB.
+
+### Snapshot baseline
+
+`drizzle/meta/` must contain a snapshot for the latest migration index so drizzle-kit diffs correctly. If snapshots are missing (0002–0006 were hand-written and have no snapshots), regenerate the baseline:
+
+```bash
+# 1. Reset local DB to a clean state by applying all migrations directly:
+psql postgresql://postgres:postgres@localhost:5433/postgres -c "DROP DATABASE IF EXISTS all_our_ideas;"
+psql postgresql://postgres:postgres@localhost:5433/postgres -c "CREATE DATABASE all_our_ideas;"
+for sql in apps/api/drizzle/000*.sql; do
+  psql postgresql://postgres:postgres@localhost:5433/all_our_ideas -f "$sql"
+done
+
+# 2. Introspect the clean DB to get a ground-truth snapshot:
+bunx drizzle-kit introspect \
+  --dialect postgresql \
+  --url postgresql://postgres:postgres@localhost:5433/all_our_ideas \
+  --out /tmp/drizzle-introspect
+
+# 3. Fix the snapshot IDs so it chains correctly, then copy it as the latest snapshot:
+python3 - <<'PY'
+import json, uuid
+LATEST_IDX = 7   # update to the current highest migration index
+PREV_ID = "80a47b20-0ea0-4be4-9730-9d3d6622f66d"  # ID of the previous known snapshot
+snap = json.load(open("/tmp/drizzle-introspect/meta/0000_snapshot.json"))
+snap["prevId"] = PREV_ID
+snap["id"] = str(uuid.uuid4())
+out = f"apps/api/drizzle/meta/{LATEST_IDX:04d}_snapshot.json"
+json.dump(snap, open(out, "w"), indent=2)
+print("Wrote", out)
+PY
+
+# 4. Now db:generate will diff from the correct baseline:
+cd apps/api && expect -c 'spawn bun run db:generate; expect eof'
+```
+
+**Note:** The `_journal.json` file must be valid JSON (no trailing commas). Linters may add trailing commas — validate with `python3 -c "import json; json.load(open('apps/api/drizzle/meta/_journal.json'))"` before running generate.
+
+## Git authentication
+
+The remote is `https://github.com/comeara13/all-our-ideas.git`. Plain `git push origin` will fail because the shell has no stored credentials. Embed the `gh` token directly in the URL:
+
+```bash
+TOKEN=$(gh auth token)
+GH_USER=$(gh api user --jq .login)
+git push "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git" <branch>
+```
+
+Same pattern for `git pull`, `git fetch`, or any other git network command:
+
+```bash
+git fetch "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git"
+```
+
+For `gh` CLI commands (PR create, view, diff, etc.) set `GITHUB_TOKEN` instead:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) gh pr view 9 --repo comeara13/all-our-ideas
+```
 
 ## Key constraints
 

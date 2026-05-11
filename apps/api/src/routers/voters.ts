@@ -5,7 +5,10 @@ import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
 import {
   affiliations,
+  assessmentQuestions,
+  assessmentResponses,
   ballots,
+  parties,
   RACE_ETHNICITY_CATEGORIES,
   voterAffiliations,
   voterRaceEthnicity,
@@ -33,6 +36,9 @@ const registerInput = z.object({
     }),
   affiliationIds: z.array(z.string().uuid()),
   consentedAt: z.string().datetime(),
+  assessmentResponses: z.array(
+    z.object({ questionId: z.string().uuid(), value: z.string().min(1) }),
+  ),
 });
 
 export const votersRouter = router({
@@ -41,8 +47,9 @@ export const votersRouter = router({
       // Lock the ballot row so concurrent registrations on the same ballot
       // queue up rather than both passing the voterId check.
       const [ballot] = await tx
-        .select({ id: ballots.id, voterId: ballots.voterId })
+        .select({ id: ballots.id, voterId: ballots.voterId, ideaBankId: parties.ideaBankId })
         .from(ballots)
+        .innerJoin(parties, eq(parties.id, ballots.partyId))
         .where(eq(ballots.id, input.ballotId))
         .for("update");
 
@@ -52,6 +59,38 @@ export const votersRouter = router({
           code: "CONFLICT",
           message: "This ballot already has a registered voter.",
         });
+      }
+
+      // Validate assessment responses: completeness, cross-bank ownership, and value type.
+      const bankQuestions = await tx
+        .select({ id: assessmentQuestions.id, type: assessmentQuestions.type })
+        .from(assessmentQuestions)
+        .where(eq(assessmentQuestions.ideaBankId, ballot.ideaBankId));
+
+      if (bankQuestions.length > 0) {
+        const questionMap = new Map(bankQuestions.map((q) => [q.id, q.type]));
+        const answeredIds = new Set(input.assessmentResponses.map((r) => r.questionId));
+
+        if (!bankQuestions.every((q) => answeredIds.has(q.id))) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "All assessment questions must be answered.",
+          });
+        }
+
+        for (const r of input.assessmentResponses) {
+          const type = questionMap.get(r.questionId);
+          if (!type) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
+          }
+          const valid =
+            type === "likert"
+              ? ["1", "2", "3", "4", "5"].includes(r.value)
+              : ["yes", "no"].includes(r.value);
+          if (!valid) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
+          }
+        }
       }
 
       const [voter] = await tx
@@ -82,6 +121,16 @@ export const votersRouter = router({
           input.affiliationIds.map((affiliationId) => ({
             voterId: voter.id,
             affiliationId,
+          })),
+        );
+      }
+
+      if (input.assessmentResponses.length > 0) {
+        await tx.insert(assessmentResponses).values(
+          input.assessmentResponses.map(({ questionId, value }) => ({
+            ballotId: input.ballotId,
+            questionId,
+            value,
           })),
         );
       }

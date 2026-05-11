@@ -888,6 +888,159 @@ function AffiliationGroupsSection({ ideaBankId }: { ideaBankId: string }) {
   );
 }
 
+// ─── Assessment Questions Section ────────────────────────────────────────────
+
+function AssessmentQuestionsSection({ ideaBankId }: { ideaBankId: string }) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.assessment.listQuestionsForBank.useQuery({ ideaBankId });
+  const [newText, setNewText] = useState("");
+  const [newType, setNewType] = useState<"likert" | "yes_no">("likert");
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const createMutation = trpc.assessment.createQuestion.useMutation({
+    onSuccess: () => {
+      setNewText("");
+      setAddError(null);
+      utils.assessment.listQuestionsForBank.invalidate({ ideaBankId });
+      utils.assessment.resultsForBank.invalidate({ ideaBankId });
+    },
+    onError: (err) => setAddError(err.message),
+  });
+
+  const deleteMutation = trpc.assessment.deleteQuestion.useMutation({
+    onSuccess: () => {
+      utils.assessment.listQuestionsForBank.invalidate({ ideaBankId });
+      utils.assessment.resultsForBank.invalidate({ ideaBankId });
+    },
+  });
+
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-gray-900">Pre-Assessment Questions</h2>
+        <p className="text-xs text-gray-500 mt-1">
+          Shown at the bottom of the voter registration form. Responses are stored per ballot.
+        </p>
+      </div>
+
+      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
+
+      {!isLoading && data?.length === 0 && (
+        <p className="text-sm text-gray-500 mb-3">No questions yet. Add one below.</p>
+      )}
+
+      {data && data.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {data.map((q) => (
+            <div
+              key={q.id}
+              className="flex items-start justify-between border border-gray-200 rounded-lg px-4 py-3 bg-white gap-3"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-800 leading-snug">{q.text}</p>
+                <span className="inline-block mt-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {q.type === "likert" ? "Likert 1–5" : "Yes / No"}
+                </span>
+              </div>
+              <button
+                onClick={() => deleteMutation.mutate({ id: q.id })}
+                disabled={deleteMutation.isPending}
+                aria-label={`Delete question: ${q.text}`}
+                className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 shrink-0"
+                title="Deletes all existing responses for this question"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (newText.trim()) createMutation.mutate({ ideaBankId, text: newText.trim(), type: newType });
+        }}
+        className="space-y-2"
+      >
+        <textarea
+          value={newText}
+          onChange={(e) => {
+            setNewText(e.target.value);
+            setAddError(null);
+          }}
+          placeholder="Question text (e.g. I believe my government listens to me)"
+          rows={2}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        />
+        <div className="flex gap-2">
+          <select
+            value={newType}
+            onChange={(e) => setNewType(e.target.value as "likert" | "yes_no")}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="likert">Likert 1–5</option>
+            <option value="yes_no">Yes / No</option>
+          </select>
+          <button
+            type="submit"
+            disabled={!newText.trim() || createMutation.isPending}
+            className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+          >
+            Add
+          </button>
+        </div>
+      </form>
+      {addError && <p className="text-xs text-red-600 mt-1">{addError}</p>}
+    </div>
+  );
+}
+
+// ─── Assessment Results Section ───────────────────────────────────────────────
+
+function AssessmentResultsSection({ ideaBankId }: { ideaBankId: string }) {
+  const { data, isLoading } = trpc.assessment.resultsForBank.useQuery({ ideaBankId });
+
+  if (isLoading) return <p className="text-sm text-gray-600">Loading…</p>;
+  if (!data?.length) return null;
+
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">Assessment Results</h2>
+      <div className="space-y-3">
+        {data.map((q) => (
+          <div key={q.id} className="border border-gray-200 rounded-lg px-4 py-3 bg-white">
+            <p className="text-sm text-gray-800 mb-1 leading-snug">{q.text}</p>
+            <div className="flex items-center gap-3 text-xs text-gray-600">
+              {q.type === "likert" ? (
+                <span>
+                  Avg:{" "}
+                  <span className="font-semibold text-gray-800">
+                    {q.avgScore !== null ? q.avgScore.toFixed(1) : "—"} / 5
+                  </span>
+                </span>
+              ) : (
+                <span>
+                  Yes:{" "}
+                  <span className="font-semibold text-gray-800">
+                    {q.responseCount > 0
+                      ? `${Math.round(((q.yesCount ?? 0) / q.responseCount) * 100)}%`
+                      : "—"}
+                  </span>
+                </span>
+              )}
+              <span className="text-gray-400">·</span>
+              <span>
+                {q.responseCount} {q.responseCount === 1 ? "response" : "responses"}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Bank Suggestions Section ─────────────────────────────────────────────────
 
 function BankSuggestionsSection({ ideaBankId }: { ideaBankId: string }) {
@@ -1222,6 +1375,12 @@ function BankDetail({ bankId }: { bankId: string }) {
 
       <div className="my-8 border-t border-gray-200" />
       <AffiliationGroupsSection ideaBankId={bankId} />
+
+      <div className="my-8 border-t border-gray-200" />
+      <AssessmentQuestionsSection ideaBankId={bankId} />
+
+      <div className="my-8 border-t border-gray-200" />
+      <AssessmentResultsSection ideaBankId={bankId} />
 
       <div className="my-8 border-t border-gray-200" />
       <PartySection bankId={bankId} />
