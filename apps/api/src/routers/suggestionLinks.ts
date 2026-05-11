@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, notInArray, inArray } from "drizzle-orm";
+import { and, eq, notExists, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
@@ -89,66 +89,50 @@ export const suggestionLinksRouter = router({
   candidateSuggestions: publicProcedure
     .input(z.object({ ideaId: z.string().uuid() }))
     .query(async ({ input }) => {
-      const [idea] = await db
-        .select({ ideaBankId: ideas.ideaBankId })
-        .from(ideas)
-        .where(eq(ideas.id, input.ideaId));
-      if (!idea) throw new TRPCError({ code: "NOT_FOUND", message: "Idea not found." });
-
-      const linked = await db
-        .select({ suggestionId: suggestionIdeaLinks.suggestionId })
+      const alreadyLinked = db
+        .select({ one: sql`1` })
         .from(suggestionIdeaLinks)
-        .where(eq(suggestionIdeaLinks.ideaId, input.ideaId));
-      const linkedIds = linked.map((r) => r.suggestionId);
-
-      const rows = await db
-        .select({
-          id: suggestedIdeas.id,
-          text: suggestedIdeas.text,
-          status: suggestedIdeas.status,
-        })
-        .from(suggestedIdeas)
         .where(
           and(
-            eq(suggestedIdeas.ideaBankId, idea.ideaBankId),
-            linkedIds.length > 0 ? notInArray(suggestedIdeas.id, linkedIds) : undefined,
+            eq(suggestionIdeaLinks.ideaId, input.ideaId),
+            eq(suggestionIdeaLinks.suggestionId, suggestedIdeas.id),
           ),
         );
-      return rows;
+
+      return db
+        .select({ id: suggestedIdeas.id, text: suggestedIdeas.text, status: suggestedIdeas.status })
+        .from(suggestedIdeas)
+        .innerJoin(ideas, eq(ideas.ideaBankId, suggestedIdeas.ideaBankId))
+        .where(and(eq(ideas.id, input.ideaId), notExists(alreadyLinked)));
     }),
 
   candidateIdeas: publicProcedure
     .input(z.object({ suggestionId: z.string().uuid() }))
     .query(async ({ input }) => {
-      const [suggestion] = await db
-        .select({ ideaBankId: suggestedIdeas.ideaBankId })
-        .from(suggestedIdeas)
-        .where(eq(suggestedIdeas.id, input.suggestionId));
-      if (!suggestion) throw new TRPCError({ code: "NOT_FOUND", message: "Suggestion not found." });
-
-      const linked = await db
-        .select({ ideaId: suggestionIdeaLinks.ideaId })
+      const alreadyLinked = db
+        .select({ one: sql`1` })
         .from(suggestionIdeaLinks)
-        .where(eq(suggestionIdeaLinks.suggestionId, input.suggestionId));
-      const linkedIds = linked.map((r) => r.ideaId);
+        .where(
+          and(
+            eq(suggestionIdeaLinks.suggestionId, input.suggestionId),
+            eq(suggestionIdeaLinks.ideaId, ideas.id),
+          ),
+        );
 
-      const rows = await db
-        .select({
-          id: ideas.id,
-          enText: ideaTranslations.text,
-        })
+      return db
+        .select({ id: ideas.id, enText: ideaTranslations.text })
         .from(ideas)
+        .innerJoin(suggestedIdeas, eq(suggestedIdeas.ideaBankId, ideas.ideaBankId))
         .leftJoin(
           ideaTranslations,
           and(eq(ideaTranslations.ideaId, ideas.id), eq(ideaTranslations.language, "en")),
         )
         .where(
           and(
-            eq(ideas.ideaBankId, suggestion.ideaBankId),
+            eq(suggestedIdeas.id, input.suggestionId),
             eq(ideas.isActive, true),
-            linkedIds.length > 0 ? notInArray(ideas.id, linkedIds) : undefined,
+            notExists(alreadyLinked),
           ),
         );
-      return rows;
     }),
 });

@@ -299,7 +299,10 @@ export const suggestionIdeaLinks = pgTable(
       .references(() => ideas.id, { onDelete: "cascade" })
       .notNull(),
   },
-  (t) => [primaryKey({ columns: [t.suggestionId, t.ideaId] })],
+  (t) => [
+    primaryKey({ columns: [t.suggestionId, t.ideaId] }),
+    index("suggestion_idea_links_idea_id_idx").on(t.ideaId),
+  ],
 );
 
 // Pre-assessment questions configured per idea bank. Shown at the bottom of the voter

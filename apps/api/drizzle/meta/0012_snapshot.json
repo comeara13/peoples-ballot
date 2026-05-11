@@ -1001,7 +1001,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "suggestion_idea_links_idea_id_idx": {
+          "name": "suggestion_idea_links_idea_id_idx",
+          "columns": [
+            {
+              "expression": "idea_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "suggestion_idea_links_suggestion_id_suggested_ideas_id_fk": {
           "name": "suggestion_idea_links_suggestion_id_suggested_ideas_id_fk",

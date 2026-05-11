@@ -480,7 +480,6 @@ function IdeaCard({
         />
       )}
 
-      {/* Linked Suggestions */}
       <div className="mt-3 pt-3 border-t border-gray-100">
         <button
           onClick={() => setShowLinkedSuggestions((v) => !v)}
@@ -488,7 +487,7 @@ function IdeaCard({
         >
           <span>{showLinkedSuggestions ? "▾" : "▸"}</span> Linked Suggestions
           {linkedSuggestions && linkedSuggestions.length > 0 && (
-            <span className="text-gray-400">({linkedSuggestions.length})</span>
+            <span className="text-gray-500">({linkedSuggestions.length})</span>
           )}
         </button>
 
@@ -513,7 +512,7 @@ function IdeaCard({
               </div>
             ))}
             {!linkedLoading && linkedSuggestions?.length === 0 && (
-              <p className="text-xs text-gray-400 py-1">No suggestions linked yet.</p>
+              <p className="text-xs text-gray-500 py-1">No suggestions linked yet.</p>
             )}
 
             <div className="relative mt-2">
@@ -529,6 +528,7 @@ function IdeaCard({
                   <div className="absolute top-full left-0 mt-1 z-20 w-80 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                     <Command>
                       <Command.Input
+                        autoFocus
                         placeholder="Search suggestions…"
                         className="w-full px-3 py-2 text-sm border-b border-gray-200 outline-none text-gray-800 placeholder:text-gray-400"
                       />
@@ -945,7 +945,6 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
         </p>
       )}
 
-      {/* Linked Ideas */}
       <div className="pt-1 border-t border-gray-100">
         <button
           onClick={() => setShowLinkedIdeas((v) => !v)}
@@ -960,7 +959,7 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
             {linkedIdeas?.map((idea) => (
               <div key={idea.id} className="flex items-start gap-2 py-1 border-t border-gray-50 text-xs">
                 <span className="flex-1 text-gray-700 leading-snug">
-                  {idea.enText ?? <span className="italic text-gray-400">No English text</span>}
+                  {idea.enText ?? <span className="italic text-gray-500">No English text</span>}
                 </span>
                 <button
                   onClick={() => unlink.mutate({ suggestionId: suggestion.id, ideaId: idea.id })}
@@ -972,7 +971,7 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
               </div>
             ))}
             {!linkedLoading && linkedIdeas?.length === 0 && (
-              <p className="text-xs text-gray-400 py-1">No ideas linked yet.</p>
+              <p className="text-xs text-gray-500 py-1">No ideas linked yet.</p>
             )}
 
             <div className="relative mt-2">
@@ -988,6 +987,7 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
                   <div className="absolute top-full left-0 mt-1 z-20 w-80 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                     <Command>
                       <Command.Input
+                        autoFocus
                         placeholder="Search ideas…"
                         className="w-full px-3 py-2 text-sm border-b border-gray-200 outline-none text-gray-800 placeholder:text-gray-400"
                       />
@@ -1005,7 +1005,7 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
                             className="px-3 py-2 text-xs text-gray-700 cursor-pointer aria-selected:bg-blue-50 aria-selected:text-blue-800 hover:bg-gray-50"
                           >
                             <span className="line-clamp-2 leading-snug">
-                              {idea.enText ?? <span className="italic text-gray-400">No English text</span>}
+                              {idea.enText ?? <span className="italic text-gray-500">No English text</span>}
                             </span>
                           </Command.Item>
                         ))}
