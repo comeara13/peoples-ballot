@@ -8,6 +8,7 @@ import { suggestedIdeasRouter } from "./suggestedIdeas";
 import { affiliationsRouter } from "./affiliations";
 import { assessmentRouter } from "./assessment";
 import { tagsRouter } from "./tags";
+import { suggestionLinksRouter } from "./suggestionLinks";
 
 export const appRouter = router({
   ideaBanks: ideaBanksRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   affiliations: affiliationsRouter,
   assessment: assessmentRouter,
   tags: tagsRouter,
+  suggestionLinks: suggestionLinksRouter,
 });
 
 export type AppRouter = typeof appRouter;
