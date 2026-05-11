@@ -57,6 +57,13 @@
       "when": 1777400000000,
       "tag": "0007_campaign_affiliations",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778473643933,
+      "tag": "0008_steep_talon",
+      "breakpoints": true
     }
   ]
 }

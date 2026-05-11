@@ -254,3 +254,35 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
     .notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Pre-assessment questions configured per idea bank. Shown at the bottom of the voter
+// registration form; voters answer before accessing the ballot pairs.
+export const assessmentQuestions = pgTable("assessment_questions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ideaBankId: uuid("idea_bank_id")
+    .references(() => ideaBanks.id, { onDelete: "cascade" })
+    .notNull(),
+  text: text("text").notNull(),
+  type: text("type", { enum: ["likert", "yes_no"] }).notNull(),
+  position: integer("position").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// One response row per question per ballot. Stored at registration time alongside
+// voter demographics — same transaction, same submit button.
+export const assessmentResponses = pgTable(
+  "assessment_responses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ballotId: uuid("ballot_id")
+      .references(() => ballots.id, { onDelete: "cascade" })
+      .notNull(),
+    questionId: uuid("question_id")
+      .references(() => assessmentQuestions.id, { onDelete: "cascade" })
+      .notNull(),
+    // "1"–"5" for likert, "yes"/"no" for yes_no
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.ballotId, t.questionId)],
+);
