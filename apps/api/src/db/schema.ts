@@ -192,10 +192,10 @@ export const ballotPairs = pgTable(
       .notNull(),
     position: integer("position").notNull(),
     leftIdeaId: uuid("left_idea_id")
-      .references(() => ideas.id)
+      .references(() => ideas.id, { onDelete: "cascade" })
       .notNull(),
     rightIdeaId: uuid("right_idea_id")
-      .references(() => ideas.id)
+      .references(() => ideas.id, { onDelete: "cascade" })
       .notNull(),
   },
   (t) => [

@@ -64,6 +64,13 @@
       "when": 1778473643933,
       "tag": "0008_steep_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778474325726,
+      "tag": "0009_polite_synch",
+      "breakpoints": true
     }
   ]
 }
