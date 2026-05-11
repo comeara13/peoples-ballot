@@ -71,6 +71,13 @@
       "when": 1778474325726,
       "tag": "0009_polite_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778476455793,
+      "tag": "0010_curly_captain_britain",
+      "breakpoints": true
     }
   ]
 }
