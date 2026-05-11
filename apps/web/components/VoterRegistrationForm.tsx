@@ -194,6 +194,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                   {...register("firstName")}
                   id="firstName"
                   placeholder="First name"
+                  required
                   aria-describedby={errors.firstName ? "firstName-error" : undefined}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -211,6 +212,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                   {...register("lastName")}
                   id="lastName"
                   placeholder="Last name"
+                  required
                   aria-describedby={errors.lastName ? "lastName-error" : undefined}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -233,6 +235,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
               id="email"
               type="email"
               placeholder="you@example.com"
+              required
               aria-describedby={errors.email ? "email-error" : undefined}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
