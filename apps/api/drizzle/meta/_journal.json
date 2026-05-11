@@ -71,6 +71,20 @@
       "when": 1778474325726,
       "tag": "0009_polite_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778476455793,
+      "tag": "0010_curly_captain_britain",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778478044854,
+      "tag": "0011_even_spencer_smythe",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import {
   ideas,
   ideaTranslations,
   parties,
+  tags,
 } from "./schema";
 import { eq } from "drizzle-orm";
 
@@ -178,6 +179,22 @@ async function seed() {
     },
   ]);
   console.log("Inserted 2 assessment questions");
+
+  await db.insert(tags).values([
+    { name: "School Board", type: "scale" },
+    { name: "City/Town", type: "scale" },
+    { name: "County", type: "scale" },
+    { name: "State", type: "scale" },
+    { name: "Federal", type: "scale" },
+    { name: "Any", type: "scale" },
+    { name: "Housing", type: "issue_category" },
+    { name: "Education", type: "issue_category" },
+    { name: "Public Safety", type: "issue_category" },
+    { name: "Transportation", type: "issue_category" },
+    { name: "Environment", type: "issue_category" },
+    { name: "Healthcare", type: "issue_category" },
+  ]).onConflictDoNothing();
+  console.log("Inserted 12 tags (6 scale, 6 issue_category)");
 
   console.log("Done.");
   process.exit(0);

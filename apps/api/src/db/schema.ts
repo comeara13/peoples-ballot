@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   uuid,
   text,
   boolean,
@@ -23,7 +24,6 @@ export const ideas = pgTable("ideas", {
   ideaBankId: uuid("idea_bank_id")
     .references(() => ideaBanks.id, { onDelete: "cascade" })
     .notNull(),
-  category: text("category"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -219,18 +219,6 @@ export const votes = pgTable(
   (t) => [index("votes_ballot_pair_id_idx").on(t.ballotPairId)],
 );
 
-export const GOVERNMENT_LEVELS = [
-  "school_board",
-  "city_town",
-  "county",
-  "state",
-  "federal",
-  "all",
-  "any",
-] as const;
-
-export type GovernmentLevel = (typeof GOVERNMENT_LEVELS)[number];
-
 // Voter-submitted idea suggestions, pending human review before entering the answer bank.
 export const suggestedIdeas = pgTable("suggested_ideas", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -243,9 +231,6 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
     .notNull(),
   voterId: uuid("voter_id").references(() => voters.id, { onDelete: "set null" }),
   text: text("text").notNull(),
-  // Stored as a native Postgres text[] — government levels are an intrinsic attribute,
-  // not a separate entity, so a junction table would add unnecessary complexity.
-  governmentLevels: text("government_levels").array().notNull().default([]),
   testimonial: text("testimonial"),
   status: text("status", {
     enum: ["pending", "approved", "rejected", "merged"],
@@ -254,6 +239,54 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
     .notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Platform-wide controlled vocabulary of tags. Typed (issue_category | scale).
+// Tags are archived rather than deleted — archived tags remain on existing items
+// but are excluded from pickers for new tagging.
+export const tagTypeEnum = pgEnum("tag_type", ["issue_category", "scale"]);
+// Derived from the enum so schema and validators stay in sync automatically.
+export const TAG_TYPES = tagTypeEnum.enumValues;
+export type TagType = (typeof TAG_TYPES)[number];
+
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    type: tagTypeEnum("type").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("tags_name_type_unique").on(t.name, t.type)],
+);
+
+// Many-to-many: ideas ↔ tags. No cascade on tag deletion (tags are only archived).
+export const ideaTags = pgTable(
+  "idea_tags",
+  {
+    ideaId: uuid("idea_id")
+      .references(() => ideas.id, { onDelete: "cascade" })
+      .notNull(),
+    tagId: uuid("tag_id")
+      .references(() => tags.id)
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ideaId, t.tagId] })],
+);
+
+// Many-to-many: suggestions ↔ tags. No cascade on tag deletion (tags are only archived).
+export const suggestionTags = pgTable(
+  "suggestion_tags",
+  {
+    suggestionId: uuid("suggestion_id")
+      .references(() => suggestedIdeas.id, { onDelete: "cascade" })
+      .notNull(),
+    tagId: uuid("tag_id")
+      .references(() => tags.id)
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.suggestionId, t.tagId] })],
+);
 
 // Pre-assessment questions configured per idea bank. Shown at the bottom of the voter
 // registration form; voters answer before accessing the ballot pairs.
