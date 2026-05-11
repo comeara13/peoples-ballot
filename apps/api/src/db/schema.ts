@@ -288,6 +288,20 @@ export const suggestionTags = pgTable(
   (t) => [primaryKey({ columns: [t.suggestionId, t.tagId] })],
 );
 
+// Many-to-many: suggestions ↔ ideas. Both FKs cascade so orphaned links are impossible.
+export const suggestionIdeaLinks = pgTable(
+  "suggestion_idea_links",
+  {
+    suggestionId: uuid("suggestion_id")
+      .references(() => suggestedIdeas.id, { onDelete: "cascade" })
+      .notNull(),
+    ideaId: uuid("idea_id")
+      .references(() => ideas.id, { onDelete: "cascade" })
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.suggestionId, t.ideaId] })],
+);
+
 // Pre-assessment questions configured per idea bank. Shown at the bottom of the voter
 // registration form; voters answer before accessing the ballot pairs.
 export const assessmentQuestions = pgTable("assessment_questions", {
