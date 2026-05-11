@@ -1,5 +1,5 @@
 import { db } from "./index";
-import { ideaBanks, ideas, ideaTranslations, parties } from "./schema";
+import { assessmentQuestions, ideaBanks, ideas, ideaTranslations, parties } from "./schema";
 import { eq } from "drizzle-orm";
 
 const BANK_NAME = "Vote Equity — Chicago 2019";
@@ -148,6 +148,22 @@ async function seed() {
     .values({ ideaBankId: bank.id, name: "April 2026 Community Meeting" })
     .returning();
   console.log(`Created party: ${party.id}`);
+
+  await db.insert(assessmentQuestions).values([
+    {
+      ideaBankId: bank.id,
+      text: "I believe that my government listens to me.",
+      type: "likert",
+      position: 0,
+    },
+    {
+      ideaBankId: bank.id,
+      text: "I participate in civic or political activities (e.g., voting, attending meetings, signing petitions) because it makes a difference.",
+      type: "likert",
+      position: 1,
+    },
+  ]);
+  console.log("Inserted 2 assessment questions");
 
   console.log("Done.");
   process.exit(0);
