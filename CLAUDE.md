@@ -82,6 +82,19 @@ On vote (non-skip): increment `prompt.votes_count`, update `idea.wins`/`idea.los
 - **Minimum for body text**: `text-gray-500`. Prefer `text-gray-600` for secondary/meta text
 - Never use `text-gray-300` or `text-gray-400` for readable text — reserved for decorative borders only
 
+## Database migrations
+
+Always use Drizzle-kit — never write migration SQL by hand or edit `drizzle/meta/_journal.json` directly.
+
+```bash
+# After changing apps/api/src/db/schema.ts:
+cd apps/api
+bun run db:generate   # creates SQL file + journal entry
+bun run db:migrate    # applies pending migrations to the local DB
+```
+
+Hand-written SQL files will be ignored by `drizzle-kit migrate` because they have no journal entry, leading to silent drift between the schema and the DB.
+
 ## Key constraints
 
 - No paper ballot export (not in MVP or near-term scope)

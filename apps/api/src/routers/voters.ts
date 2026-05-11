@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
@@ -36,10 +36,6 @@ const registerInput = z.object({
 });
 
 export const votersRouter = router({
-  listAffiliations: publicProcedure.query(() =>
-    db.select().from(affiliations).orderBy(asc(affiliations.type), asc(affiliations.name)),
-  ),
-
   register: publicProcedure.input(registerInput).mutation(async ({ input }) => {
     return db.transaction(async (tx) => {
       // Lock the ballot row so concurrent registrations on the same ballot
@@ -108,7 +104,7 @@ export const votersRouter = router({
       .where(eq(voterRaceEthnicity.voterId, input.id));
 
     const affiliationRows = await db
-      .select({ id: affiliations.id, name: affiliations.name, type: affiliations.type })
+      .select({ id: affiliations.id, name: affiliations.name })
       .from(voterAffiliations)
       .innerJoin(affiliations, eq(affiliations.id, voterAffiliations.affiliationId))
       .where(eq(voterAffiliations.voterId, input.id));
