@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, notExists, sql } from "drizzle-orm";
+import { and, eq, inArray, notExists, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
@@ -8,7 +8,6 @@ import {
   suggestedIdeas,
   ideas,
   ideaTranslations,
-  voters,
 } from "../db/schema";
 
 export const suggestionLinksRouter = router({
@@ -57,13 +56,9 @@ export const suggestionLinksRouter = router({
           id: suggestedIdeas.id,
           text: suggestedIdeas.text,
           status: suggestedIdeas.status,
-          createdAt: suggestedIdeas.createdAt,
-          voterFirstName: voters.firstName,
-          voterLastName: voters.lastName,
         })
         .from(suggestionIdeaLinks)
         .innerJoin(suggestedIdeas, eq(suggestedIdeas.id, suggestionIdeaLinks.suggestionId))
-        .leftJoin(voters, eq(voters.id, suggestedIdeas.voterId))
         .where(eq(suggestionIdeaLinks.ideaId, input.ideaId));
       return rows;
     }),
@@ -103,7 +98,13 @@ export const suggestionLinksRouter = router({
         .select({ id: suggestedIdeas.id, text: suggestedIdeas.text, status: suggestedIdeas.status })
         .from(suggestedIdeas)
         .innerJoin(ideas, eq(ideas.ideaBankId, suggestedIdeas.ideaBankId))
-        .where(and(eq(ideas.id, input.ideaId), notExists(alreadyLinked)));
+        .where(
+          and(
+            eq(ideas.id, input.ideaId),
+            inArray(suggestedIdeas.status, ["pending", "approved"]),
+            notExists(alreadyLinked),
+          ),
+        );
     }),
 
   candidateIdeas: publicProcedure

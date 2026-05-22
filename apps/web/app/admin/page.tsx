@@ -309,6 +309,7 @@ function IdeaCard({
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showLinkedSuggestions, setShowLinkedSuggestions] = useState(false);
   const [showSuggestionPicker, setShowSuggestionPicker] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const utils = trpc.useUtils();
 
   const { data: linkedSuggestions, isLoading: linkedLoading } =
@@ -322,18 +323,22 @@ function IdeaCard({
   );
   const linkSuggestion = trpc.suggestionLinks.link.useMutation({
     onSuccess: () => {
+      setLinkError(null);
       utils.suggestionLinks.listForIdea.invalidate({ ideaId: idea.id });
       utils.suggestionLinks.candidateSuggestions.invalidate({ ideaId: idea.id });
       utils.suggestedIdeas.invalidate();
       setShowSuggestionPicker(false);
     },
+    onError: (err) => setLinkError(err.message),
   });
   const unlinkSuggestion = trpc.suggestionLinks.unlink.useMutation({
     onSuccess: () => {
+      setLinkError(null);
       utils.suggestionLinks.listForIdea.invalidate({ ideaId: idea.id });
       utils.suggestionLinks.candidateSuggestions.invalidate({ ideaId: idea.id });
       utils.suggestedIdeas.invalidate();
     },
+    onError: (err) => setLinkError(err.message),
   });
 
   const currentTagIds = new Set(idea.tags.map((t) => t.id));
@@ -494,6 +499,7 @@ function IdeaCard({
         {showLinkedSuggestions && (
           <div className="mt-2 space-y-1">
             {linkedLoading && <p className="text-xs text-gray-500">Loading…</p>}
+            {linkError && <p className="text-xs text-red-600">{linkError}</p>}
             {linkedSuggestions?.map((s) => (
               <div key={s.id} className="flex items-start gap-2 py-1 border-t border-gray-50 text-xs">
                 <span
@@ -870,6 +876,7 @@ type SuggestionRow = {
 function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
   const [showLinkedIdeas, setShowLinkedIdeas] = useState(false);
   const [showIdeaPicker, setShowIdeaPicker] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const utils = trpc.useUtils();
 
   const { data: linkedIdeas, isLoading: linkedLoading } =
@@ -884,18 +891,22 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
 
   const link = trpc.suggestionLinks.link.useMutation({
     onSuccess: () => {
+      setLinkError(null);
       utils.suggestionLinks.listForSuggestion.invalidate({ suggestionId: suggestion.id });
       utils.suggestionLinks.candidateIdeas.invalidate({ suggestionId: suggestion.id });
       utils.suggestedIdeas.invalidate();
       setShowIdeaPicker(false);
     },
+    onError: (err) => setLinkError(err.message),
   });
   const unlink = trpc.suggestionLinks.unlink.useMutation({
     onSuccess: () => {
+      setLinkError(null);
       utils.suggestionLinks.listForSuggestion.invalidate({ suggestionId: suggestion.id });
       utils.suggestionLinks.candidateIdeas.invalidate({ suggestionId: suggestion.id });
       utils.suggestedIdeas.invalidate();
     },
+    onError: (err) => setLinkError(err.message),
   });
 
   const isLinked = suggestion.linkedIdeaCount > 0;
@@ -951,11 +962,15 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
           className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 font-medium"
         >
           <span>{showLinkedIdeas ? "▾" : "▸"}</span> Linked Ideas
+          {suggestion.linkedIdeaCount > 0 && (
+            <span className="text-gray-500">({suggestion.linkedIdeaCount})</span>
+          )}
         </button>
 
         {showLinkedIdeas && (
           <div className="mt-2 space-y-1">
             {linkedLoading && <p className="text-xs text-gray-500">Loading…</p>}
+            {linkError && <p className="text-xs text-red-600">{linkError}</p>}
             {linkedIdeas?.map((idea) => (
               <div key={idea.id} className="flex items-start gap-2 py-1 border-t border-gray-50 text-xs">
                 <span className="flex-1 text-gray-700 leading-snug">
