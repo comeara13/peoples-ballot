@@ -577,8 +577,8 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
 
   const pairs = ballot.pairs.map((p) => ({
     id: p.id,
-    left: { id: p.leftIdeaId, text: p.leftText },
-    right: { id: p.rightIdeaId, text: p.rightText },
+    left: { id: p.leftIdeaId, text: p.leftText, glossaryTerms: p.leftGlossaryTerms ?? [] },
+    right: { id: p.rightIdeaId, text: p.rightText, glossaryTerms: p.rightGlossaryTerms ?? [] },
   }));
 
   const answered = Object.keys(state).length;

@@ -7,6 +7,7 @@ import {
   integer,
   timestamp,
   unique,
+  uniqueIndex,
   check,
   index,
   primaryKey,
@@ -293,6 +294,29 @@ export const suggestionTags = pgTable(
       .notNull(),
   },
   (t) => [primaryKey({ columns: [t.suggestionId, t.tagId] })],
+);
+
+// Platform-wide glossary of term definitions. Markdown body. Archived rather than deleted.
+export const glossaryTerms = pgTable(
+  "glossary_terms",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("glossary_terms_title_active_unique").on(sql`lower(${t.title})`).where(sql`${t.archivedAt} IS NULL`)],
+);
+
+// Many-to-many: ideas ↔ glossary_terms. No cascade on term deletion (terms only archived).
+export const ideaGlossaryTerms = pgTable(
+  "idea_glossary_terms",
+  {
+    ideaId: uuid("idea_id").references(() => ideas.id, { onDelete: "cascade" }).notNull(),
+    termId: uuid("term_id").references(() => glossaryTerms.id).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ideaId, t.termId] })],
 );
 
 // Many-to-many: suggestions ↔ ideas. Both FKs cascade so orphaned links are impossible.

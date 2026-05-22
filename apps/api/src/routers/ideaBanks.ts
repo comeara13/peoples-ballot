@@ -3,7 +3,7 @@ import { eq, count, inArray, or, and, ne } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
-import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes, ideaTags, tags } from "../db/schema";
+import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes, ideaTags, tags, glossaryTerms, ideaGlossaryTerms } from "../db/schema";
 import { computeScore } from "../scoring";
 
 export const ideaBanksRouter = router({
@@ -98,6 +98,15 @@ export const ideaBanksRouter = router({
             .where(inArray(ideaTags.ideaId, ideaIds))
         : [];
 
+    const ideaGlossaryRows =
+      ideaIds.length > 0
+        ? await db
+            .select({ ideaId: ideaGlossaryTerms.ideaId, term: glossaryTerms })
+            .from(ideaGlossaryTerms)
+            .innerJoin(glossaryTerms, eq(glossaryTerms.id, ideaGlossaryTerms.termId))
+            .where(inArray(ideaGlossaryTerms.ideaId, ideaIds))
+        : [];
+
     // Fetch ballot_pairs involving any of this bank's ideas
     const pairsForIdeas =
       ideaIds.length > 0
@@ -139,6 +148,23 @@ export const ideaBanksRouter = router({
       lossesMap.set(loserId, (lossesMap.get(loserId) ?? 0) + 1);
     }
 
+    // Pre-build maps to avoid O(n×m) filtering inside the ideas loop.
+    const translationsByIdeaId = new Map<string, typeof translations>();
+    for (const t of translations) {
+      if (!translationsByIdeaId.has(t.ideaId)) translationsByIdeaId.set(t.ideaId, []);
+      translationsByIdeaId.get(t.ideaId)!.push(t);
+    }
+    const tagsByIdeaId = new Map<string, typeof ideaTagRows>();
+    for (const r of ideaTagRows) {
+      if (!tagsByIdeaId.has(r.ideaId)) tagsByIdeaId.set(r.ideaId, []);
+      tagsByIdeaId.get(r.ideaId)!.push(r);
+    }
+    const glossaryByIdeaId = new Map<string, typeof ideaGlossaryRows>();
+    for (const r of ideaGlossaryRows) {
+      if (!glossaryByIdeaId.has(r.ideaId)) glossaryByIdeaId.set(r.ideaId, []);
+      glossaryByIdeaId.get(r.ideaId)!.push(r);
+    }
+
     return {
       ...bank,
       ideas: ideasList
@@ -151,8 +177,9 @@ export const ideaBanksRouter = router({
             losses: l,
             score: computeScore(w, l),
             voteCount: w + l,
-            translations: translations.filter((t) => t.ideaId === idea.id),
-            tags: ideaTagRows.filter((r) => r.ideaId === idea.id).map((r) => r.tag),
+            translations: translationsByIdeaId.get(idea.id) ?? [],
+            tags: (tagsByIdeaId.get(idea.id) ?? []).map((r) => r.tag),
+            glossaryTerms: (glossaryByIdeaId.get(idea.id) ?? []).map((r) => r.term),
           };
         })
         .sort((a, b) => b.score - a.score || b.wins - a.wins),

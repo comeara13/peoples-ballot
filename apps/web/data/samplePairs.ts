@@ -1,6 +1,6 @@
 import type { Pair } from "@/types/ballot";
 
-export const samplePairs: Pair[] = [
+const rawPairs: Array<{ id: string; left: { id: string; text: string }; right: { id: string; text: string } }> = [
   {
     id: "pair-1",
     left: {
@@ -216,3 +216,9 @@ export const samplePairs: Pair[] = [
     },
   },
 ];
+
+export const samplePairs: Pair[] = rawPairs.map((p) => ({
+  ...p,
+  left: { ...p.left, glossaryTerms: [] },
+  right: { ...p.right, glossaryTerms: [] },
+}));

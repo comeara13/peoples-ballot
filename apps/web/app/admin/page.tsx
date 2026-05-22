@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@clerk/clerk-react";
 import { Command } from "cmdk";
 import { trpc, type RouterOutput } from "@/lib/trpc";
@@ -43,6 +44,7 @@ const SUGGESTION_STATUS_STYLES: Record<string, string> = {
 };
 
 type Tag = RouterOutput["tags"]["list"][number];
+type GlossaryTerm = RouterOutput["glossary"]["list"][number];
 
 const TAG_TYPE_STYLES: Record<string, string> = {
   issue_category: "bg-indigo-100 text-indigo-700",
@@ -60,6 +62,7 @@ type Idea = {
   createdAt: Date | string;
   translations: Translation[];
   tags: Tag[];
+  glossaryTerms: GlossaryTerm[];
 };
 
 // ─── Branding field helper ────────────────────────────────────────────────────
@@ -426,16 +429,21 @@ function IdeaCard({
   idea,
   availableTags,
   onSetTags,
+  availableGlossaryTerms,
+  onSetGlossaryTerms,
   onUpsertTranslation,
 }: {
   idea: Idea;
   availableTags: Tag[];
   onSetTags: (ideaId: string, tagIds: string[]) => void;
+  availableGlossaryTerms: GlossaryTerm[];
+  onSetGlossaryTerms: (ideaId: string, termIds: string[]) => void;
   onUpsertTranslation: (ideaId: string, language: string, text: string) => void;
 }) {
   const [editingLang, setEditingLang] = useState<string | null>(null);
   const [addingTranslation, setAddingTranslation] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
+  const [showGlossaryPicker, setShowGlossaryPicker] = useState(false);
   const [showLinkedSuggestions, setShowLinkedSuggestions] = useState(false);
   const [showSuggestionPicker, setShowSuggestionPicker] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -480,6 +488,23 @@ function IdeaCard({
   function addTag(tagId: string) {
     onSetTags(idea.id, [...idea.tags.map((t) => t.id), tagId]);
     setShowTagPicker(false);
+  }
+
+  const currentTermIds = new Set(idea.glossaryTerms.map((t) => t.id));
+  const unpickedGlossaryTerms = availableGlossaryTerms.filter(
+    (t) => !currentTermIds.has(t.id) && !t.archivedAt,
+  );
+
+  function removeTerm(termId: string) {
+    onSetGlossaryTerms(
+      idea.id,
+      idea.glossaryTerms.filter((t) => t.id !== termId).map((t) => t.id),
+    );
+  }
+
+  function addTerm(termId: string) {
+    onSetGlossaryTerms(idea.id, [...idea.glossaryTerms.map((t) => t.id), termId]);
+    setShowGlossaryPicker(false);
   }
 
   const existingLanguages = idea.translations.map((t) => t.language);
@@ -564,6 +589,55 @@ function IdeaCard({
                   );
                 })}
               </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Glossary term chips + picker */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3 relative">
+        {idea.glossaryTerms.map((term) => (
+          <span
+            key={term.id}
+            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${term.archivedAt ? "bg-gray-100 text-gray-500 line-through" : "bg-amber-100 text-amber-700"}`}
+          >
+            {term.title}
+            <button
+              onClick={() => removeTerm(term.id)}
+              aria-label={`Remove glossary term ${term.title}`}
+              className="hover:opacity-60 leading-none"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </span>
+        ))}
+        {unpickedGlossaryTerms.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowGlossaryPicker((v) => !v)}
+              className="text-xs text-gray-500 hover:text-gray-800 border border-dashed border-gray-300 rounded-full px-2 py-0.5"
+            >
+              + glossary
+            </button>
+            {showGlossaryPicker && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowGlossaryPicker(false)}
+                  aria-hidden
+                />
+                <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[200px] max-h-48 overflow-y-auto">
+                  {unpickedGlossaryTerms.map((term) => (
+                    <button
+                      key={term.id}
+                      onClick={() => addTerm(term.id)}
+                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-amber-50"
+                    >
+                      {term.title}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1919,9 +1993,13 @@ function BankDetail({ bankId }: { bankId: string }) {
   const utils = trpc.useUtils();
   const { data, isLoading, error, refetch } = trpc.ideaBanks.getById.useQuery({ id: bankId });
   const { data: availableTags = [] } = trpc.tags.list.useQuery(undefined);
+  const { data: availableGlossaryTerms = [] } = trpc.glossary.list.useQuery({ includeArchived: true });
   const [showAddForm, setShowAddForm] = useState(false);
 
   const setIdeaTags = trpc.ideaBanks.setIdeaTags.useMutation({
+    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
+  });
+  const setIdeaGlossaryTerms = trpc.glossary.setIdeaTerms.useMutation({
     onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
   });
   const upsertTranslation = trpc.ideaBanks.upsertTranslation.useMutation({
@@ -1978,6 +2056,10 @@ function BankDetail({ bankId }: { bankId: string }) {
             idea={idea}
             availableTags={availableTags}
             onSetTags={(ideaId, tagIds) => setIdeaTags.mutate({ ideaId, tagIds })}
+            availableGlossaryTerms={availableGlossaryTerms}
+            onSetGlossaryTerms={(ideaId, termIds) =>
+              setIdeaGlossaryTerms.mutate({ ideaId, termIds })
+            }
             onUpsertTranslation={(ideaId, language, text) =>
               upsertTranslation.mutate({ ideaId, language, text })
             }
@@ -2150,6 +2232,30 @@ function TagManagementSection() {
   );
 }
 
+// ─── Glossary Management Section ─────────────────────────────────────────────
+
+function GlossaryManagementSection() {
+  const { data } = trpc.glossary.list.useQuery(undefined);
+  const count = data?.length ?? 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-base font-semibold text-gray-900">Glossary</h2>
+        <Link
+          href="/admin/glossary"
+          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+        >
+          Manage glossary →
+        </Link>
+      </div>
+      <p className="text-xs text-gray-500">
+        {count} term{count !== 1 ? "s" : ""} defined. Link terms to individual ideas via the idea
+        card in each bank.
+      </p>
+    </div>
+  );
+}
+
 // ─── Admin Content (uses useSearchParams) ────────────────────────────────────
 
 function AdminContent() {
@@ -2169,6 +2275,8 @@ function AdminContent() {
             <BankList />
             <div className="my-8 border-t border-gray-200" />
             <TagManagementSection />
+            <div className="my-8 border-t border-gray-200" />
+            <GlossaryManagementSection />
           </>
         )}
       </div>

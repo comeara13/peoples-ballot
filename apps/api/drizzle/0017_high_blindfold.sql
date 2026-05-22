@@ -1,0 +1,2 @@
+ALTER TABLE "glossary_terms" DROP CONSTRAINT "glossary_terms_title_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "glossary_terms_title_active_unique" ON "glossary_terms" USING btree (lower("title")) WHERE "glossary_terms"."archived_at" IS NULL;
