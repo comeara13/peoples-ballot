@@ -16,6 +16,9 @@ import { sql } from "drizzle-orm";
 export const ideaBanks = pgTable("idea_banks", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  title: text("title"),
+  subtitle: text("subtitle"),
+  headerImageUrl: text("header_image_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -77,6 +80,9 @@ export const parties = pgTable(
       .references(() => ideaBanks.id, { onDelete: "cascade" })
       .notNull(),
     name: text("name").notNull(),
+    title: text("title"),
+    subtitle: text("subtitle"),
+    headerImageUrl: text("header_image_url"),
     status: text("status", { enum: ["active", "closed"] })
       .default("active")
       .notNull(),

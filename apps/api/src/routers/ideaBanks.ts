@@ -8,10 +8,53 @@ import { computeScore } from "../scoring";
 
 export const ideaBanksRouter = router({
   create: publicProcedure
-    .input(z.object({ name: z.string().min(1).max(200) }))
+    .input(
+      z.object({
+        name: z.string().min(1).max(200),
+        title: z.string().max(200).optional(),
+        subtitle: z.string().max(500).optional(),
+        headerImageUrl: z.string().url().optional(),
+      }),
+    )
     .mutation(async ({ input }) => {
-      const [bank] = await db.insert(ideaBanks).values({ name: input.name }).returning();
+      const [bank] = await db
+        .insert(ideaBanks)
+        .values({
+          name: input.name,
+          title: input.title ?? null,
+          subtitle: input.subtitle ?? null,
+          headerImageUrl: input.headerImageUrl ?? null,
+        })
+        .returning();
       return bank;
+    }),
+
+  update: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        name: z.string().min(1).max(200).optional(),
+        title: z.string().max(200).nullable().optional(),
+        subtitle: z.string().max(500).nullable().optional(),
+        headerImageUrl: z.string().url().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const [existing] = await db.select().from(ideaBanks).where(eq(ideaBanks.id, input.id));
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [updated] = await db
+        .update(ideaBanks)
+        .set({
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.title !== undefined && { title: input.title }),
+          ...(input.subtitle !== undefined && { subtitle: input.subtitle }),
+          ...(input.headerImageUrl !== undefined && { headerImageUrl: input.headerImageUrl }),
+        })
+        .where(eq(ideaBanks.id, input.id))
+        .returning();
+
+      return updated;
     }),
 
   list: publicProcedure.query(async () => {
@@ -19,6 +62,9 @@ export const ideaBanksRouter = router({
       .select({
         id: ideaBanks.id,
         name: ideaBanks.name,
+        title: ideaBanks.title,
+        subtitle: ideaBanks.subtitle,
+        headerImageUrl: ideaBanks.headerImageUrl,
         createdAt: ideaBanks.createdAt,
         ideaCount: count(ideas.id),
       })

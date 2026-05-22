@@ -61,6 +61,104 @@ type Idea = {
   tags: Tag[];
 };
 
+// ─── Branding field helper ────────────────────────────────────────────────────
+
+function BrandingField({
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-700 mb-0.5">{label}</label>
+      {hint && <p className="text-xs text-gray-500 mb-1">{hint}</p>}
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:border-blue-500"
+      />
+    </div>
+  );
+}
+
+// ─── Bank Branding Section ────────────────────────────────────────────────────
+
+function BankBrandingSection({ bank }: { bank: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null } }) {
+  const utils = trpc.useUtils();
+  const [title, setTitle] = useState(bank.title ?? "");
+  const [subtitle, setSubtitle] = useState(bank.subtitle ?? "");
+  const [headerImageUrl, setHeaderImageUrl] = useState(bank.headerImageUrl ?? "");
+
+  const update = trpc.ideaBanks.update.useMutation({
+    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bank.id }),
+  });
+
+  const dirty =
+    title !== (bank.title ?? "") ||
+    subtitle !== (bank.subtitle ?? "") ||
+    headerImageUrl !== (bank.headerImageUrl ?? "");
+
+  function save() {
+    update.mutate({
+      id: bank.id,
+      title: title.trim() || null,
+      subtitle: subtitle.trim() || null,
+      headerImageUrl: headerImageUrl.trim() || null,
+    });
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+      <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+        Campaign Branding
+      </h2>
+      <div className="space-y-3">
+        <BrandingField
+          label="Title"
+          value={title}
+          onChange={setTitle}
+          placeholder="Displayed on the landing page (defaults to bank name)"
+        />
+        <BrandingField
+          label="Subtitle"
+          value={subtitle}
+          onChange={setSubtitle}
+          placeholder="Optional tagline or description"
+        />
+        <BrandingField
+          label="Header Image URL"
+          value={headerImageUrl}
+          onChange={setHeaderImageUrl}
+          placeholder="https://…"
+        />
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={save}
+            disabled={!dirty || update.isPending}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+          >
+            {update.isPending ? "Saving…" : "Save Branding"}
+          </button>
+          {update.isSuccess && !dirty && (
+            <span className="text-xs text-green-600">Saved</span>
+          )}
+          {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Create Bank Form ─────────────────────────────────────────────────────────
 
 function CreateBankForm({
@@ -1397,6 +1495,9 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [startAtOverride, setStartAtOverride] = useState<string | null>(null);
   const [endAtOverride, setEndAtOverride] = useState<string | null>(null);
+  const [brandingTitle, setBrandingTitle] = useState<string | null>(null);
+  const [brandingSubtitle, setBrandingSubtitle] = useState<string | null>(null);
+  const [brandingImageUrl, setBrandingImageUrl] = useState<string | null>(null);
 
   const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery({
     partyId,
@@ -1423,6 +1524,10 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
     onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
   });
 
+  const updateBranding = trpc.parties.update.useMutation({
+    onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
+  });
+
   const isClosed = party?.status === "closed";
   const windowDirty =
     party &&
@@ -1436,6 +1541,26 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
       id: partyId,
       startAt: windowStartAt ? new Date(windowStartAt).toISOString() : undefined,
       endAt: windowEndAt ? new Date(windowEndAt).toISOString() : null,
+    });
+  }
+
+  const effectiveBrandingTitle = brandingTitle ?? (party?.title ?? "");
+  const effectiveBrandingSubtitle = brandingSubtitle ?? (party?.subtitle ?? "");
+  const effectiveBrandingImageUrl = brandingImageUrl ?? (party?.headerImageUrl ?? "");
+  const brandingDirty =
+    party &&
+    (brandingTitle !== null || brandingSubtitle !== null || brandingImageUrl !== null) &&
+    (effectiveBrandingTitle !== (party.title ?? "") ||
+      effectiveBrandingSubtitle !== (party.subtitle ?? "") ||
+      effectiveBrandingImageUrl !== (party.headerImageUrl ?? ""));
+
+  function saveBranding() {
+    if (!party) return;
+    updateBranding.mutate({
+      id: partyId,
+      title: effectiveBrandingTitle.trim() || null,
+      subtitle: effectiveBrandingSubtitle.trim() || null,
+      headerImageUrl: effectiveBrandingImageUrl.trim() || null,
     });
   }
 
@@ -1531,6 +1656,55 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
         </div>
       )}
 
+      {/* Party branding override */}
+      {party && (
+        <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+          <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+            Branding Override
+          </h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Leave blank to inherit from the campaign.
+          </p>
+          <div className="space-y-3">
+            <BrandingField
+              label="Title"
+              value={effectiveBrandingTitle}
+              onChange={setBrandingTitle}
+              placeholder="Override campaign title…"
+            />
+            <BrandingField
+              label="Subtitle"
+              value={effectiveBrandingSubtitle}
+              onChange={setBrandingSubtitle}
+              placeholder="Override campaign subtitle…"
+            />
+            <BrandingField
+              label="Header Image URL"
+              value={effectiveBrandingImageUrl}
+              onChange={setBrandingImageUrl}
+              placeholder="https://…"
+            />
+            {!isClosed && (
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  onClick={saveBranding}
+                  disabled={!brandingDirty || updateBranding.isPending}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+                >
+                  {updateBranding.isPending ? "Saving…" : "Save Branding"}
+                </button>
+                {updateBranding.isSuccess && !brandingDirty && (
+                  <span className="text-xs text-green-600">Saved</span>
+                )}
+                {updateBranding.error && (
+                  <span className="text-xs text-red-600">{updateBranding.error.message}</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-900">Ballots</h2>
         {!isClosed && (
@@ -1621,6 +1795,8 @@ function BankDetail({ bankId }: { bankId: string }) {
           </button>
         )}
       </div>
+
+      <BankBrandingSection bank={data} />
 
       {showAddForm && (
         <AddIdeaForm

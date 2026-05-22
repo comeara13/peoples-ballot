@@ -92,6 +92,13 @@
       "when": 1778478621478,
       "tag": "0012_wide_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779428946437,
+      "tag": "0013_hot_abomination",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import {
   ballots,
   ballotPairs,
   ideas,
+  ideaBanks,
   parties,
   prompts,
   ideaTranslations,
@@ -14,6 +15,7 @@ import {
 } from "../db/schema";
 import { buildPairWeights, weightedSample } from "../catchup";
 import { checkPartyWindow } from "../partyWindow";
+import { resolveBranding } from "../branding";
 
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
 
@@ -152,12 +154,31 @@ export const ballotsRouter = router({
       .where(eq(ballotPairs.ballotId, input.id))
       .orderBy(ballotPairs.position);
 
-    const [party] = await db
-      .select({ status: parties.status, startAt: parties.startAt, endAt: parties.endAt })
+    const [partyRow] = await db
+      .select({
+        status: parties.status,
+        startAt: parties.startAt,
+        endAt: parties.endAt,
+        title: parties.title,
+        subtitle: parties.subtitle,
+        headerImageUrl: parties.headerImageUrl,
+        ideaBankId: parties.ideaBankId,
+      })
       .from(parties)
       .where(eq(parties.id, ballot.partyId));
 
-    if (!pairs.length) return { ...ballot, party: party ?? null, voteCount: 0, pairs: [] };
+    let branding = { title: "", subtitle: null as string | null, headerImageUrl: null as string | null };
+    if (partyRow) {
+      const [bankRow] = await db
+        .select({ name: ideaBanks.name, title: ideaBanks.title, subtitle: ideaBanks.subtitle, headerImageUrl: ideaBanks.headerImageUrl })
+        .from(ideaBanks)
+        .where(eq(ideaBanks.id, partyRow.ideaBankId));
+      if (bankRow) branding = resolveBranding(bankRow, partyRow);
+    }
+
+    const party = partyRow ? { status: partyRow.status, startAt: partyRow.startAt, endAt: partyRow.endAt } : null;
+
+    if (!pairs.length) return { ...ballot, party, branding, voteCount: 0, pairs: [] };
 
     const ideaIds = [...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId]))];
 
@@ -182,7 +203,8 @@ export const ballotsRouter = router({
 
     return {
       ...ballot,
-      party: party ?? null,
+      party,
+      branding,
       voteCount: votesList.length,
       pairs: pairs.map((pair) => ({
         ...pair,

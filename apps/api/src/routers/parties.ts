@@ -11,6 +11,9 @@ export const partiesRouter = router({
       z.object({
         ideaBankId: z.string().uuid(),
         name: z.string().min(1).max(200),
+        title: z.string().max(200).optional(),
+        subtitle: z.string().max(500).optional(),
+        headerImageUrl: z.string().url().optional(),
         startAt: z.string().datetime().optional(),
         endAt: z.string().datetime().optional(),
       }),
@@ -21,6 +24,9 @@ export const partiesRouter = router({
         .values({
           ideaBankId: input.ideaBankId,
           name: input.name,
+          title: input.title ?? null,
+          subtitle: input.subtitle ?? null,
+          headerImageUrl: input.headerImageUrl ?? null,
           startAt: input.startAt ? new Date(input.startAt) : new Date(),
           endAt: input.endAt ? new Date(input.endAt) : undefined,
         })
@@ -33,6 +39,9 @@ export const partiesRouter = router({
       z.object({
         id: z.string().uuid(),
         name: z.string().min(1).max(200).optional(),
+        title: z.string().max(200).nullable().optional(),
+        subtitle: z.string().max(500).nullable().optional(),
+        headerImageUrl: z.string().url().nullable().optional(),
         startAt: z.string().datetime().optional(),
         endAt: z.string().datetime().nullable().optional(),
       }),
@@ -47,6 +56,9 @@ export const partiesRouter = router({
         .update(parties)
         .set({
           ...(input.name !== undefined && { name: input.name }),
+          ...(input.title !== undefined && { title: input.title }),
+          ...(input.subtitle !== undefined && { subtitle: input.subtitle }),
+          ...(input.headerImageUrl !== undefined && { headerImageUrl: input.headerImageUrl }),
           ...(input.startAt !== undefined && { startAt: new Date(input.startAt) }),
           ...(input.endAt !== undefined && { endAt: input.endAt ? new Date(input.endAt) : null }),
         })
@@ -63,6 +75,9 @@ export const partiesRouter = router({
         .select({
           id: parties.id,
           name: parties.name,
+          title: parties.title,
+          subtitle: parties.subtitle,
+          headerImageUrl: parties.headerImageUrl,
           status: parties.status,
           startAt: parties.startAt,
           endAt: parties.endAt,
