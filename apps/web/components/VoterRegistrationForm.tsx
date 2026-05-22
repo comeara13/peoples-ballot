@@ -61,7 +61,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   const { data: affiliationsList, isLoading: affiliationsLoading } =
     trpc.affiliations.listForBallot.useQuery({ ballotId });
   const { data: assessmentQuestions, isLoading: assessmentQuestionsLoading } =
-    trpc.assessment.listQuestionsForBallot.useQuery({ ballotId });
+    trpc.assessment.listQuestionsForBallot.useQuery({ ballotId, stage: "pre" });
 
   const registerMutation = trpc.voters.register.useMutation({
     onSuccess: () => onSuccess(),

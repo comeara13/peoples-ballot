@@ -1301,11 +1301,84 @@ function AffiliationGroupsSection({ ideaBankId }: { ideaBankId: string }) {
   );
 }
 
+// ─── Post-Vote Section ────────────────────────────────────────────────────────
+
+function PostVoteSection({ bank }: { bank: { id: string; postVoteMessage: string | null } }) {
+  const utils = trpc.useUtils();
+  const [message, setMessage] = useState(bank.postVoteMessage ?? "");
+  const [showSaved, setShowSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const update = trpc.ideaBanks.update.useMutation({
+    onSuccess: (data) => {
+      utils.ideaBanks.getById.invalidate({ id: bank.id });
+      setMessage(data.postVoteMessage ?? "");
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      setShowSaved(true);
+      savedTimer.current = setTimeout(() => setShowSaved(false), 2500);
+    },
+  });
+
+  const dirty = message !== (bank.postVoteMessage ?? "");
+
+  function save() {
+    update.mutate({ id: bank.id, postVoteMessage: message.trim() || null });
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+      <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+        Post-Vote
+      </h2>
+      <div className="space-y-3">
+        <div>
+          <label htmlFor={`post-vote-msg-${bank.id}`} className="block text-xs font-medium text-gray-700 mb-0.5">
+            Thank-you message
+          </label>
+          <p className="text-xs text-gray-500 mb-1">Shown immediately after ballot submission.</p>
+          <input
+            id={`post-vote-msg-${bank.id}`}
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Thank you for voting!"
+            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <p className="text-xs text-gray-500">
+          Survey questions shown after voting are configured in the <strong>Survey Questions</strong> section below.
+        </p>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={save}
+            disabled={!dirty || update.isPending}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+          >
+            {update.isPending ? "Saving…" : "Save"}
+          </button>
+          <span role="status" aria-live="polite" className="text-xs text-green-600">
+            {showSaved ? "Saved" : ""}
+          </span>
+          {update.error && (
+            <span role="alert" className="text-xs text-red-600">{update.error.message}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Assessment Questions Section ────────────────────────────────────────────
 
-function AssessmentQuestionsSection({ ideaBankId }: { ideaBankId: string }) {
+function AssessmentQuestionsSection({
+  ideaBankId,
+  stage,
+}: {
+  ideaBankId: string;
+  stage: "pre" | "post";
+}) {
   const utils = trpc.useUtils();
-  const { data, isLoading } = trpc.assessment.listQuestionsForBank.useQuery({ ideaBankId });
+  const { data, isLoading } = trpc.assessment.listQuestionsForBank.useQuery({ ideaBankId, stage });
   const [newText, setNewText] = useState("");
   const [newType, setNewType] = useState<"likert" | "yes_no">("likert");
   const [addError, setAddError] = useState<string | null>(null);
@@ -1314,26 +1387,30 @@ function AssessmentQuestionsSection({ ideaBankId }: { ideaBankId: string }) {
     onSuccess: () => {
       setNewText("");
       setAddError(null);
-      utils.assessment.listQuestionsForBank.invalidate({ ideaBankId });
-      utils.assessment.resultsForBank.invalidate({ ideaBankId });
+      utils.assessment.listQuestionsForBank.invalidate({ ideaBankId, stage });
+      utils.assessment.resultsForBank.invalidate({ ideaBankId, stage });
     },
     onError: (err) => setAddError(err.message),
   });
 
   const deleteMutation = trpc.assessment.deleteQuestion.useMutation({
     onSuccess: () => {
-      utils.assessment.listQuestionsForBank.invalidate({ ideaBankId });
-      utils.assessment.resultsForBank.invalidate({ ideaBankId });
+      utils.assessment.listQuestionsForBank.invalidate({ ideaBankId, stage });
+      utils.assessment.resultsForBank.invalidate({ ideaBankId, stage });
     },
   });
+
+  const title = stage === "pre" ? "Pre-Vote Questions" : "Post-Vote Questions";
+  const hint =
+    stage === "pre"
+      ? "Shown on the voter registration form before voting."
+      : "Shown after ballot submission.";
 
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-base font-semibold text-gray-900">Pre-Assessment Questions</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Shown at the bottom of the voter registration form. Responses are stored per ballot.
-        </p>
+        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        <p className="text-xs text-gray-500 mt-1">{hint}</p>
       </div>
 
       {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
@@ -1372,7 +1449,8 @@ function AssessmentQuestionsSection({ ideaBankId }: { ideaBankId: string }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (newText.trim()) createMutation.mutate({ ideaBankId, text: newText.trim(), type: newType });
+          if (newText.trim())
+            createMutation.mutate({ ideaBankId, text: newText.trim(), type: newType, stage });
         }}
         className="space-y-2"
       >
@@ -1411,15 +1489,23 @@ function AssessmentQuestionsSection({ ideaBankId }: { ideaBankId: string }) {
 
 // ─── Assessment Results Section ───────────────────────────────────────────────
 
-function AssessmentResultsSection({ ideaBankId }: { ideaBankId: string }) {
-  const { data, isLoading } = trpc.assessment.resultsForBank.useQuery({ ideaBankId });
+function AssessmentResultsSection({
+  ideaBankId,
+  stage,
+}: {
+  ideaBankId: string;
+  stage: "pre" | "post";
+}) {
+  const { data, isLoading } = trpc.assessment.resultsForBank.useQuery({ ideaBankId, stage });
 
   if (isLoading) return <p className="text-sm text-gray-600">Loading…</p>;
   if (!data?.length) return null;
 
+  const title = stage === "pre" ? "Pre-Vote Results" : "Post-Vote Results";
+
   return (
     <div>
-      <h2 className="text-base font-semibold text-gray-900 mb-4">Assessment Results</h2>
+      <h2 className="text-base font-semibold text-gray-900 mb-4">{title}</h2>
       <div className="space-y-3">
         {data.map((q) => (
           <div key={q.id} className="border border-gray-200 rounded-lg px-4 py-3 bg-white">
@@ -1870,6 +1956,8 @@ function BankDetail({ bankId }: { bankId: string }) {
 
       <BankBrandingSection key={data.id} bank={data} />
 
+      <PostVoteSection key={`pv-${data.id}`} bank={data} />
+
       {showAddForm && (
         <AddIdeaForm
           bankId={bankId}
@@ -1899,10 +1987,16 @@ function BankDetail({ bankId }: { bankId: string }) {
       <AffiliationGroupsSection ideaBankId={bankId} />
 
       <div className="my-8 border-t border-gray-200" />
-      <AssessmentQuestionsSection ideaBankId={bankId} />
+      <AssessmentQuestionsSection ideaBankId={bankId} stage="pre" />
 
       <div className="my-8 border-t border-gray-200" />
-      <AssessmentResultsSection ideaBankId={bankId} />
+      <AssessmentQuestionsSection ideaBankId={bankId} stage="post" />
+
+      <div className="my-8 border-t border-gray-200" />
+      <AssessmentResultsSection ideaBankId={bankId} stage="pre" />
+
+      <div className="my-8 border-t border-gray-200" />
+      <AssessmentResultsSection ideaBankId={bankId} stage="post" />
 
       <div className="my-8 border-t border-gray-200" />
       <PartySection bankId={bankId} />

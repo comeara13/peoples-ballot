@@ -335,6 +335,147 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
   );
 }
 
+// ─── Post-vote survey ─────────────────────────────────────────────────────────
+
+type SurveyQuestion = { id: string; text: string; type: "likert" | "yes_no" };
+
+function PostVoteSurvey({
+  ballotId,
+  postVoteMessage,
+  onComplete,
+}: {
+  ballotId: string;
+  postVoteMessage: string;
+  onComplete: () => void;
+}) {
+  const { data: questions = [], isLoading } = trpc.assessment.listQuestionsForBallot.useQuery(
+    { ballotId, stage: "post" },
+  );
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answerError, setAnswerError] = useState<string | null>(null);
+  const submit = trpc.assessment.submitPostVoteResponses.useMutation({ onSuccess: onComplete });
+
+  const allAnswered =
+    (questions as SurveyQuestion[]).length === 0 ||
+    (questions as SurveyQuestion[]).every((q) => answers[q.id] !== undefined);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!allAnswered) {
+      setAnswerError("Please answer all questions before submitting.");
+      return;
+    }
+    submit.mutate({
+      ballotId,
+      responses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
+    });
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-lg mx-auto px-4 py-10">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm mb-4">
+          <p className="text-lg font-semibold text-gray-900">{postVoteMessage}</p>
+        </div>
+
+        {!isLoading && (questions as SurveyQuestion[]).length > 0 && (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <h2 className="text-base font-semibold text-gray-900">A few quick questions</h2>
+
+            {(questions as SurveyQuestion[]).map((q) => (
+              <div key={q.id}>
+                <p className="text-sm text-gray-800 mb-3">{q.text}</p>
+                {q.type === "likert" ? (
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
+                      <span>Strongly Disagree</span>
+                      <span>Strongly Agree</span>
+                    </div>
+                    <div className="flex gap-2" role="group" aria-label={q.text}>
+                      {["1", "2", "3", "4", "5"].map((val) => {
+                        const selected = answers[q.id] === val;
+                        return (
+                          <button
+                            key={val}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => {
+                              setAnswers((prev) => ({ ...prev, [q.id]: val }));
+                              setAnswerError(null);
+                            }}
+                            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              selected
+                                ? "bg-blue-600 border-blue-600 text-white"
+                                : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                            }`}
+                          >
+                            {val}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3" role="group" aria-label={q.text}>
+                    {["yes", "no"].map((val) => {
+                      const selected = answers[q.id] === val;
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => {
+                            setAnswers((prev) => ({ ...prev, [q.id]: val }));
+                            setAnswerError(null);
+                          }}
+                          className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 capitalize ${
+                            selected
+                              ? "bg-blue-600 border-blue-600 text-white"
+                              : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {answerError && (
+              <p role="alert" className="text-xs text-red-600">{answerError}</p>
+            )}
+            {submit.error && (
+              <p role="alert" className="text-xs text-red-600">{submit.error.message}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={!allAnswered || submit.isPending}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+            >
+              {submit.isPending ? "Submitting…" : "Submit Survey"}
+            </button>
+          </form>
+        )}
+
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={onComplete}
+            className="text-sm text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+          >
+            Skip to results →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Live voting view ─────────────────────────────────────────────────────────
 
 function LiveBallot({ ballotId }: { ballotId: string }) {
@@ -343,6 +484,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   const { data: ballot, isLoading, error } = trpc.ballots.getById.useQuery({ id: ballotId });
   const [state, setState] = useState<BallotState>({});
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [postSurveyDone, setPostSurveyDone] = useState(false);
   const submitMutation = trpc.ballots.submit.useMutation({
     onSuccess: () => utils.ballots.getById.invalidate({ id: ballotId }),
   });
@@ -380,7 +522,17 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
-  if (submitMutation.isSuccess) {
+  if (submitMutation.isSuccess && !postSurveyDone) {
+    return (
+      <PostVoteSurvey
+        ballotId={ballotId}
+        postVoteMessage={ballot.postVoteMessage ?? "Thank you for voting!"}
+        onComplete={() => setPostSurveyDone(true)}
+      />
+    );
+  }
+
+  if (submitMutation.isSuccess && postSurveyDone) {
     const pairsWithVotes = ballot.pairs.map((p) => ({
       ...p,
       vote: state[p.id] ? { selection: state[p.id] } : null,

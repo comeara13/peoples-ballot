@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
@@ -65,7 +65,12 @@ export const votersRouter = router({
       const bankQuestions = await tx
         .select({ id: assessmentQuestions.id, type: assessmentQuestions.type })
         .from(assessmentQuestions)
-        .where(eq(assessmentQuestions.ideaBankId, ballot.ideaBankId));
+        .where(
+          and(
+            eq(assessmentQuestions.ideaBankId, ballot.ideaBankId),
+            eq(assessmentQuestions.stage, "pre"),
+          ),
+        );
 
       if (bankQuestions.length > 0) {
         const questionMap = new Map(bankQuestions.map((q) => [q.id, q.type]));

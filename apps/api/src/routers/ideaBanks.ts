@@ -37,6 +37,7 @@ export const ideaBanksRouter = router({
         title: z.string().min(1).max(200).nullable().optional(),
         subtitle: z.string().min(1).max(500).nullable().optional(),
         headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
+        postVoteMessage: z.string().min(1).max(500).nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -47,6 +48,7 @@ export const ideaBanksRouter = router({
           ...(input.title !== undefined && { title: input.title }),
           ...(input.subtitle !== undefined && { subtitle: input.subtitle }),
           ...(input.headerImageUrl !== undefined && { headerImageUrl: input.headerImageUrl }),
+          ...(input.postVoteMessage !== undefined && { postVoteMessage: input.postVoteMessage }),
         })
         .where(eq(ideaBanks.id, input.id))
         .returning();
@@ -63,6 +65,7 @@ export const ideaBanksRouter = router({
         title: ideaBanks.title,
         subtitle: ideaBanks.subtitle,
         headerImageUrl: ideaBanks.headerImageUrl,
+        postVoteMessage: ideaBanks.postVoteMessage,
         createdAt: ideaBanks.createdAt,
         ideaCount: count(ideas.id),
       })

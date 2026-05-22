@@ -1,0 +1,1 @@
+ALTER TABLE "assessment_questions" ADD COLUMN "stage" text DEFAULT 'pre' NOT NULL;
