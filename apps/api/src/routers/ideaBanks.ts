@@ -148,6 +148,23 @@ export const ideaBanksRouter = router({
       lossesMap.set(loserId, (lossesMap.get(loserId) ?? 0) + 1);
     }
 
+    // Pre-build maps to avoid O(n×m) filtering inside the ideas loop.
+    const translationsByIdeaId = new Map<string, typeof translations>();
+    for (const t of translations) {
+      if (!translationsByIdeaId.has(t.ideaId)) translationsByIdeaId.set(t.ideaId, []);
+      translationsByIdeaId.get(t.ideaId)!.push(t);
+    }
+    const tagsByIdeaId = new Map<string, typeof ideaTagRows>();
+    for (const r of ideaTagRows) {
+      if (!tagsByIdeaId.has(r.ideaId)) tagsByIdeaId.set(r.ideaId, []);
+      tagsByIdeaId.get(r.ideaId)!.push(r);
+    }
+    const glossaryByIdeaId = new Map<string, typeof ideaGlossaryRows>();
+    for (const r of ideaGlossaryRows) {
+      if (!glossaryByIdeaId.has(r.ideaId)) glossaryByIdeaId.set(r.ideaId, []);
+      glossaryByIdeaId.get(r.ideaId)!.push(r);
+    }
+
     return {
       ...bank,
       ideas: ideasList
@@ -160,9 +177,9 @@ export const ideaBanksRouter = router({
             losses: l,
             score: computeScore(w, l),
             voteCount: w + l,
-            translations: translations.filter((t) => t.ideaId === idea.id),
-            tags: ideaTagRows.filter((r) => r.ideaId === idea.id).map((r) => r.tag),
-            glossaryTerms: ideaGlossaryRows.filter((r) => r.ideaId === idea.id).map((r) => r.term),
+            translations: translationsByIdeaId.get(idea.id) ?? [],
+            tags: (tagsByIdeaId.get(idea.id) ?? []).map((r) => r.tag),
+            glossaryTerms: (glossaryByIdeaId.get(idea.id) ?? []).map((r) => r.term),
           };
         })
         .sort((a, b) => b.score - a.score || b.wins - a.wins),

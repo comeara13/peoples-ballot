@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { AdminGuard } from "@/components/AdminGuard";
@@ -19,23 +19,33 @@ function GlossaryTermRow({ term, onArchive, onUnarchive, onUpdate }: {
   term: Term;
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
-  onUpdate: (id: string, title: string, body: string) => void;
+  onUpdate: (id: string, title: string, body: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editTitle, setEditTitle] = useState(term.title);
   const [editBody, setEditBody] = useState(term.body);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const archived = Boolean(term.archivedAt);
 
-  function handleSave() {
-    if (editTitle.trim() && editBody.trim()) {
-      onUpdate(term.id, editTitle.trim(), editBody.trim());
+  async function handleSave() {
+    if (!editTitle.trim() || !editBody.trim()) return;
+    setSaving(true);
+    setUpdateError(null);
+    try {
+      await onUpdate(term.id, editTitle.trim(), editBody.trim());
       setEditing(false);
+    } catch (err: unknown) {
+      setUpdateError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
     }
   }
 
   function handleCancel() {
     setEditTitle(term.title);
     setEditBody(term.body);
+    setUpdateError(null);
     setEditing(false);
   }
 
@@ -70,17 +80,19 @@ function GlossaryTermRow({ term, onArchive, onUnarchive, onUpdate }: {
             rows={5}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y font-mono"
           />
+          {updateError && <p className="text-xs text-red-600">{updateError}</p>}
           <div className="flex gap-2">
             <button
               onClick={handleSave}
-              disabled={!editTitle.trim() || !editBody.trim()}
+              disabled={!editTitle.trim() || !editBody.trim() || saving}
               className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
             >
-              Save
+              {saving ? "Saving…" : "Save"}
             </button>
             <button
               onClick={handleCancel}
-              className="px-3 py-1.5 border border-gray-300 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+              disabled={saving}
+              className="px-3 py-1.5 border border-gray-300 text-sm text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -136,9 +148,7 @@ function GlossaryContent() {
     onError: (err) => setCreateError(err.message),
   });
 
-  const updateMutation = trpc.glossary.update.useMutation({
-    onSuccess: () => utils.glossary.list.invalidate(),
-  });
+  const updateMutation = trpc.glossary.update.useMutation();
 
   const archiveMutation = trpc.glossary.archive.useMutation({
     onSuccess: () => utils.glossary.list.invalidate(),
@@ -241,7 +251,14 @@ function GlossaryContent() {
                 term={term}
                 onArchive={(id) => archiveMutation.mutate({ id })}
                 onUnarchive={(id) => unarchiveMutation.mutate({ id })}
-                onUpdate={(id, title, body) => updateMutation.mutate({ id, title, body })}
+                onUpdate={(id, title, body) =>
+                  new Promise<void>((resolve, reject) => {
+                    updateMutation.mutate({ id, title, body }, {
+                      onSuccess: () => { utils.glossary.list.invalidate(); resolve(); },
+                      onError: (err) => reject(err),
+                    });
+                  })
+                }
               />
             ))}
 
@@ -261,7 +278,14 @@ function GlossaryContent() {
                         term={term}
                         onArchive={(id) => archiveMutation.mutate({ id })}
                         onUnarchive={(id) => unarchiveMutation.mutate({ id })}
-                        onUpdate={(id, title, body) => updateMutation.mutate({ id, title, body })}
+                        onUpdate={(id, title, body) =>
+                          new Promise<void>((resolve, reject) => {
+                            updateMutation.mutate({ id, title, body }, {
+                              onSuccess: () => { utils.glossary.list.invalidate(); resolve(); },
+                              onError: (err) => reject(err),
+                            });
+                          })
+                        }
                       />
                     ))}
                   </div>
@@ -280,15 +304,7 @@ function GlossaryContent() {
 export default function GlossaryAdminPage() {
   return (
     <AdminGuard>
-      <Suspense
-        fallback={
-          <main className="min-h-screen bg-gray-50">
-            <div className="mx-auto max-w-3xl px-4 py-8 text-sm text-gray-600">Loading…</div>
-          </main>
-        }
-      >
-        <GlossaryContent />
-      </Suspense>
+      <GlossaryContent />
     </AdminGuard>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { Command } from "cmdk";
 import { trpc, type RouterOutput } from "@/lib/trpc";
@@ -598,7 +599,7 @@ function IdeaCard({
         {idea.glossaryTerms.map((term) => (
           <span
             key={term.id}
-            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${term.archivedAt ? "bg-gray-100 text-gray-400 line-through" : "bg-amber-100 text-amber-700"}`}
+            className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${term.archivedAt ? "bg-gray-100 text-gray-500 line-through" : "bg-amber-100 text-amber-700"}`}
           >
             {term.title}
             <button
@@ -606,7 +607,7 @@ function IdeaCard({
               aria-label={`Remove glossary term ${term.title}`}
               className="hover:opacity-60 leading-none"
             >
-              ×
+              <span aria-hidden="true">×</span>
             </button>
           </span>
         ))}
@@ -619,17 +620,24 @@ function IdeaCard({
               + glossary
             </button>
             {showGlossaryPicker && (
-              <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[200px] max-h-48 overflow-y-auto">
-                {unpickedGlossaryTerms.map((term) => (
-                  <button
-                    key={term.id}
-                    onClick={() => addTerm(term.id)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-amber-50"
-                  >
-                    {term.title}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowGlossaryPicker(false)}
+                  aria-hidden
+                />
+                <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[200px] max-h-48 overflow-y-auto">
+                  {unpickedGlossaryTerms.map((term) => (
+                    <button
+                      key={term.id}
+                      onClick={() => addTerm(term.id)}
+                      className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-amber-50"
+                    >
+                      {term.title}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -2233,12 +2241,12 @@ function GlossaryManagementSection() {
     <div>
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-base font-semibold text-gray-900">Glossary</h2>
-        <a
+        <Link
           href="/admin/glossary"
           className="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
           Manage glossary →
-        </a>
+        </Link>
       </div>
       <p className="text-xs text-gray-500">
         {count} term{count !== 1 ? "s" : ""} defined. Link terms to individual ideas via the idea

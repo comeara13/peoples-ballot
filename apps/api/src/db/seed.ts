@@ -10,7 +10,7 @@ import {
   parties,
   tags,
 } from "./schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, isNull, and } from "drizzle-orm";
 
 // Glossary terms relevant to Chicago 2019 equity voting context.
 // Each entry lists the term and which idea indices (0-based into IDEAS[]) it applies to.
@@ -248,13 +248,23 @@ async function seed() {
     .values(GLOSSARY.map(({ title, body }) => ({ title, body })))
     .onConflictDoNothing()
     .returning();
-  console.log(`Inserted ${insertedTerms.length} glossary terms`);
+
+  // onConflictDoNothing().returning() only returns newly inserted rows, so if any
+  // terms pre-existed the array would be shorter than GLOSSARY and indices would misalign.
+  // Re-fetch all terms by title to get stable IDs regardless of pre-existing rows.
+  const termTitles = GLOSSARY.map((g) => g.title);
+  const allTermRows = await db
+    .select()
+    .from(glossaryTerms)
+    .where(and(inArray(glossaryTerms.title, termTitles), isNull(glossaryTerms.archivedAt)));
+  const termByTitle = new Map(allTermRows.map((t) => [t.title, t]));
+  console.log(`Inserted ${insertedTerms.length} new glossary terms (${allTermRows.length} active total)`);
 
   const ideaLinks: { ideaId: string; termId: string }[] = [];
-  for (let gi = 0; gi < GLOSSARY.length; gi++) {
-    const term = insertedTerms[gi];
+  for (const entry of GLOSSARY) {
+    const term = termByTitle.get(entry.title);
     if (!term) continue;
-    for (const ideaIdx of GLOSSARY[gi].ideaIndices) {
+    for (const ideaIdx of entry.ideaIndices) {
       const idea = inserted[ideaIdx];
       if (idea) ideaLinks.push({ ideaId: idea.id, termId: term.id });
     }

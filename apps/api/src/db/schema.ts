@@ -7,6 +7,7 @@ import {
   integer,
   timestamp,
   unique,
+  uniqueIndex,
   check,
   index,
   primaryKey,
@@ -305,7 +306,7 @@ export const glossaryTerms = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [unique("glossary_terms_title_unique").on(t.title)],
+  (t) => [uniqueIndex("glossary_terms_title_active_unique").on(sql`lower(${t.title})`).where(sql`${t.archivedAt} IS NULL`)],
 );
 
 // Many-to-many: ideas ↔ glossary_terms. No cascade on term deletion (terms only archived).

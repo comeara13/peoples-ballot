@@ -21,6 +21,39 @@ export function GlossaryPopover({ terms, ideaText }: GlossaryPopoverProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
+  // Hoist openPopover as a stable callback so it can be referenced before the early return.
+  const openPopover = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const top =
+      rect.bottom + MARGIN + POPOVER_HEIGHT > vh
+        ? rect.top - POPOVER_HEIGHT - MARGIN
+        : rect.bottom + MARGIN;
+    const left = Math.max(MARGIN, Math.min(rect.left, vw - POPOVER_WIDTH - MARGIN));
+    setPos({ top, left });
+    setOpen(true);
+  }, []);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current !== null) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  }, []);
+
+  // Clean up pending close timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
   // Focus the popover when it opens (keyboard accessibility).
   useEffect(() => {
     if (open) dialogRef.current?.focus();
@@ -54,32 +87,7 @@ export function GlossaryPopover({ terms, ideaText }: GlossaryPopoverProps) {
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open]);
 
-  const scheduleClose = useCallback(() => {
-    closeTimer.current = setTimeout(() => setOpen(false), 120);
-  }, []);
-
-  const cancelClose = useCallback(() => {
-    if (closeTimer.current !== null) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  }, []);
-
   if (terms.length === 0) return null;
-
-  function openPopover() {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const top =
-      rect.bottom + MARGIN + POPOVER_HEIGHT > vh
-        ? rect.top - POPOVER_HEIGHT - MARGIN
-        : rect.bottom + MARGIN;
-    const left = Math.max(MARGIN, Math.min(rect.left, vw - POPOVER_WIDTH - MARGIN));
-    setPos({ top, left });
-    setOpen(true);
-  }
 
   const label = `Definitions for: ${ideaText.slice(0, 60)}`;
 
@@ -92,13 +100,17 @@ export function GlossaryPopover({ terms, ideaText }: GlossaryPopoverProps) {
         aria-controls={open ? id : undefined}
         onClick={(e) => {
           e.stopPropagation();
-          open ? setOpen(false) : openPopover();
+          // Never toggle-close via click — hover already opened it; close via Escape or click-outside.
+          if (!open) {
+            cancelClose();
+            openPopover();
+          }
         }}
         onMouseEnter={() => { cancelClose(); openPopover(); }}
         onMouseLeave={scheduleClose}
         className={[
-          "-m-3 p-3 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
-          open ? "text-blue-500" : "text-gray-400 hover:text-blue-500",
+          "-m-3.5 p-3.5 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+          open ? "text-blue-500" : "text-gray-500 hover:text-blue-500",
         ].join(" ")}
       >
         <svg
@@ -136,16 +148,26 @@ export function GlossaryPopover({ terms, ideaText }: GlossaryPopoverProps) {
               triggerRef.current?.focus();
             }}
             aria-label="Close definitions"
-            className="absolute top-2 right-2 p-1 rounded text-gray-400 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 leading-none"
+            className="absolute top-2 right-2 p-1 rounded text-gray-500 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 leading-none"
           >
-            ×
+            <span aria-hidden="true">×</span>
           </button>
           <ul className="space-y-4 list-none p-0 m-0 pr-4">
             {terms.map((term) => (
               <li key={term.id}>
                 <h3 className="text-sm font-semibold text-gray-800 mb-1">{term.title}</h3>
                 <div className="text-sm text-gray-600 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-blue-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_strong]:font-semibold">
-                  <Markdown>{term.body}</Markdown>
+                  <Markdown
+                    components={{
+                      a: ({ href, children }) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer">
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {term.body}
+                  </Markdown>
                 </div>
               </li>
             ))}

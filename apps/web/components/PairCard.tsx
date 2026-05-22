@@ -29,7 +29,7 @@ export function PairCard({ pair, index, selection, onSelect }: PairCardProps) {
             <div className="min-h-[64px] flex items-center pr-6">{pair.left.text}</div>
             <div className="mt-2 text-xs text-gray-400">ID: {pair.left.id}</div>
           </button>
-          <div className="absolute top-2 right-2 ">
+          <div className="absolute top-2 right-2 pointer-events-auto">
             <GlossaryPopover terms={pair.left.glossaryTerms} ideaText={pair.left.text} />
           </div>
         </div>
@@ -52,7 +52,7 @@ export function PairCard({ pair, index, selection, onSelect }: PairCardProps) {
             <div className="min-h-[64px] flex items-center pr-6">{pair.right.text}</div>
             <div className="mt-2 text-xs text-gray-400">ID: {pair.right.id}</div>
           </button>
-          <div className="absolute top-2 right-2 ">
+          <div className="absolute top-2 right-2 pointer-events-auto">
             <GlossaryPopover terms={pair.right.glossaryTerms} ideaText={pair.right.text} />
           </div>
         </div>
