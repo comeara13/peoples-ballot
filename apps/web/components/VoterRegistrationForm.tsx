@@ -61,7 +61,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   const { data: affiliationsList, isLoading: affiliationsLoading } =
     trpc.affiliations.listForBallot.useQuery({ ballotId });
   const { data: assessmentQuestions, isLoading: assessmentQuestionsLoading } =
-    trpc.assessment.listQuestionsForBallot.useQuery({ ballotId });
+    trpc.assessment.listQuestionsForBallot.useQuery({ ballotId, stage: "pre" });
 
   const registerMutation = trpc.voters.register.useMutation({
     onSuccess: () => onSuccess(),
@@ -444,7 +444,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                           <span>Strongly Disagree</span>
                           <span>Strongly Agree</span>
                         </div>
-                        <div className="flex gap-2" role="group">
+                        <div className="flex gap-2" role="radiogroup">
                           {["1", "2", "3", "4", "5"].map((val) => {
                             const selected = assessmentAnswers[q.id] === val;
                             return (
@@ -470,7 +470,7 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                         </div>
                       </div>
                     ) : (
-                      <div className="flex gap-3" role="group">
+                      <div className="flex gap-3" role="radiogroup">
                         {["yes", "no"].map((val) => {
                           const selected = assessmentAnswers[q.id] === val;
                           return (

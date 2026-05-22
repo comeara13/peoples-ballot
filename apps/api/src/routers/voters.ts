@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
@@ -14,6 +14,7 @@ import {
   voterRaceEthnicity,
   voters,
 } from "../db/schema";
+import { isValidSurveyValue } from "../surveyValidation";
 
 const registerInput = z.object({
   // ballotId links the voter to their ballot immediately upon registration.
@@ -65,7 +66,12 @@ export const votersRouter = router({
       const bankQuestions = await tx
         .select({ id: assessmentQuestions.id, type: assessmentQuestions.type })
         .from(assessmentQuestions)
-        .where(eq(assessmentQuestions.ideaBankId, ballot.ideaBankId));
+        .where(
+          and(
+            eq(assessmentQuestions.ideaBankId, ballot.ideaBankId),
+            eq(assessmentQuestions.stage, "pre"),
+          ),
+        );
 
       if (bankQuestions.length > 0) {
         const questionMap = new Map(bankQuestions.map((q) => [q.id, q.type]));
@@ -83,11 +89,7 @@ export const votersRouter = router({
           if (!type) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
           }
-          const valid =
-            type === "likert"
-              ? ["1", "2", "3", "4", "5"].includes(r.value)
-              : ["yes", "no"].includes(r.value);
-          if (!valid) {
+          if (!isValidSurveyValue(type, r.value)) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
           }
         }
