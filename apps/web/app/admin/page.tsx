@@ -100,7 +100,12 @@ function BankBrandingSection({ bank }: { bank: { id: string; title: string | nul
   const [headerImageUrl, setHeaderImageUrl] = useState(bank.headerImageUrl ?? "");
 
   const update = trpc.ideaBanks.update.useMutation({
-    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bank.id }),
+    onSuccess: (data) => {
+      utils.ideaBanks.getById.invalidate({ id: bank.id });
+      setTitle(data.title ?? "");
+      setSubtitle(data.subtitle ?? "");
+      setHeaderImageUrl(data.headerImageUrl ?? "");
+    },
   });
 
   const dirty =
@@ -1485,6 +1490,90 @@ function PartySection({ bankId }: { bankId: string }) {
   );
 }
 
+// ─── Party Branding Section ───────────────────────────────────────────────────
+
+function PartyBrandingSection({
+  party,
+  bankId,
+  isClosed,
+}: {
+  party: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null };
+  bankId: string;
+  isClosed: boolean;
+}) {
+  const utils = trpc.useUtils();
+  const [title, setTitle] = useState(party.title ?? "");
+  const [subtitle, setSubtitle] = useState(party.subtitle ?? "");
+  const [headerImageUrl, setHeaderImageUrl] = useState(party.headerImageUrl ?? "");
+
+  const update = trpc.parties.update.useMutation({
+    onSuccess: (data) => {
+      utils.parties.listByBank.invalidate({ ideaBankId: bankId });
+      setTitle(data.title ?? "");
+      setSubtitle(data.subtitle ?? "");
+      setHeaderImageUrl(data.headerImageUrl ?? "");
+    },
+  });
+
+  const dirty =
+    title !== (party.title ?? "") ||
+    subtitle !== (party.subtitle ?? "") ||
+    headerImageUrl !== (party.headerImageUrl ?? "");
+
+  function save() {
+    update.mutate({
+      id: party.id,
+      title: title.trim() || null,
+      subtitle: subtitle.trim() || null,
+      headerImageUrl: headerImageUrl.trim() || null,
+    });
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+      <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+        Branding Override
+      </h2>
+      <p className="text-xs text-gray-500 mb-3">Leave blank to inherit from the campaign.</p>
+      <div className="space-y-3">
+        <BrandingField
+          label="Title"
+          value={title}
+          onChange={setTitle}
+          placeholder="Override campaign title…"
+        />
+        <BrandingField
+          label="Subtitle"
+          value={subtitle}
+          onChange={setSubtitle}
+          placeholder="Override campaign subtitle…"
+        />
+        <BrandingField
+          label="Header Image URL"
+          value={headerImageUrl}
+          onChange={setHeaderImageUrl}
+          placeholder="https://…"
+        />
+        {!isClosed && (
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={save}
+              disabled={!dirty || update.isPending}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+            >
+              {update.isPending ? "Saving…" : "Save Branding"}
+            </button>
+            {update.isSuccess && !dirty && (
+              <span className="text-xs text-green-600">Saved</span>
+            )}
+            {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Party Detail (shown when partyId is in query params) ────────────────────
 
 function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
@@ -1495,9 +1584,6 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [startAtOverride, setStartAtOverride] = useState<string | null>(null);
   const [endAtOverride, setEndAtOverride] = useState<string | null>(null);
-  const [brandingTitle, setBrandingTitle] = useState<string | null>(null);
-  const [brandingSubtitle, setBrandingSubtitle] = useState<string | null>(null);
-  const [brandingImageUrl, setBrandingImageUrl] = useState<string | null>(null);
 
   const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery({
     partyId,
@@ -1524,10 +1610,6 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
     onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
   });
 
-  const updateBranding = trpc.parties.update.useMutation({
-    onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
-  });
-
   const isClosed = party?.status === "closed";
   const windowDirty =
     party &&
@@ -1541,26 +1623,6 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
       id: partyId,
       startAt: windowStartAt ? new Date(windowStartAt).toISOString() : undefined,
       endAt: windowEndAt ? new Date(windowEndAt).toISOString() : null,
-    });
-  }
-
-  const effectiveBrandingTitle = brandingTitle ?? (party?.title ?? "");
-  const effectiveBrandingSubtitle = brandingSubtitle ?? (party?.subtitle ?? "");
-  const effectiveBrandingImageUrl = brandingImageUrl ?? (party?.headerImageUrl ?? "");
-  const brandingDirty =
-    party &&
-    (brandingTitle !== null || brandingSubtitle !== null || brandingImageUrl !== null) &&
-    (effectiveBrandingTitle !== (party.title ?? "") ||
-      effectiveBrandingSubtitle !== (party.subtitle ?? "") ||
-      effectiveBrandingImageUrl !== (party.headerImageUrl ?? ""));
-
-  function saveBranding() {
-    if (!party) return;
-    updateBranding.mutate({
-      id: partyId,
-      title: effectiveBrandingTitle.trim() || null,
-      subtitle: effectiveBrandingSubtitle.trim() || null,
-      headerImageUrl: effectiveBrandingImageUrl.trim() || null,
     });
   }
 
@@ -1658,51 +1720,7 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
 
       {/* Party branding override */}
       {party && (
-        <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
-          <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
-            Branding Override
-          </h2>
-          <p className="text-xs text-gray-500 mb-3">
-            Leave blank to inherit from the campaign.
-          </p>
-          <div className="space-y-3">
-            <BrandingField
-              label="Title"
-              value={effectiveBrandingTitle}
-              onChange={setBrandingTitle}
-              placeholder="Override campaign title…"
-            />
-            <BrandingField
-              label="Subtitle"
-              value={effectiveBrandingSubtitle}
-              onChange={setBrandingSubtitle}
-              placeholder="Override campaign subtitle…"
-            />
-            <BrandingField
-              label="Header Image URL"
-              value={effectiveBrandingImageUrl}
-              onChange={setBrandingImageUrl}
-              placeholder="https://…"
-            />
-            {!isClosed && (
-              <div className="flex items-center gap-3 pt-1">
-                <button
-                  onClick={saveBranding}
-                  disabled={!brandingDirty || updateBranding.isPending}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
-                >
-                  {updateBranding.isPending ? "Saving…" : "Save Branding"}
-                </button>
-                {updateBranding.isSuccess && !brandingDirty && (
-                  <span className="text-xs text-green-600">Saved</span>
-                )}
-                {updateBranding.error && (
-                  <span className="text-xs text-red-600">{updateBranding.error.message}</span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <PartyBrandingSection key={party.id} party={party} bankId={bankId} isClosed={isClosed} />
       )}
 
       <div className="flex items-center justify-between mb-4">

@@ -13,7 +13,7 @@ export const ideaBanksRouter = router({
         name: z.string().min(1).max(200),
         title: z.string().max(200).optional(),
         subtitle: z.string().max(500).optional(),
-        headerImageUrl: z.string().url().optional(),
+        headerImageUrl: z.string().url().startsWith("https://").optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -36,7 +36,7 @@ export const ideaBanksRouter = router({
         name: z.string().min(1).max(200).optional(),
         title: z.string().max(200).nullable().optional(),
         subtitle: z.string().max(500).nullable().optional(),
-        headerImageUrl: z.string().url().nullable().optional(),
+        headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {

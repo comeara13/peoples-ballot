@@ -154,29 +154,33 @@ export const ballotsRouter = router({
       .where(eq(ballotPairs.ballotId, input.id))
       .orderBy(ballotPairs.position);
 
-    const [partyRow] = await db
+    const [joined] = await db
       .select({
-        status: parties.status,
-        startAt: parties.startAt,
-        endAt: parties.endAt,
-        title: parties.title,
-        subtitle: parties.subtitle,
-        headerImageUrl: parties.headerImageUrl,
-        ideaBankId: parties.ideaBankId,
+        partyStatus: parties.status,
+        partyStartAt: parties.startAt,
+        partyEndAt: parties.endAt,
+        partyTitle: parties.title,
+        partySubtitle: parties.subtitle,
+        partyHeaderImageUrl: parties.headerImageUrl,
+        bankName: ideaBanks.name,
+        bankTitle: ideaBanks.title,
+        bankSubtitle: ideaBanks.subtitle,
+        bankHeaderImageUrl: ideaBanks.headerImageUrl,
       })
       .from(parties)
+      .innerJoin(ideaBanks, eq(ideaBanks.id, parties.ideaBankId))
       .where(eq(parties.id, ballot.partyId));
 
-    let branding = { title: "", subtitle: null as string | null, headerImageUrl: null as string | null };
-    if (partyRow) {
-      const [bankRow] = await db
-        .select({ name: ideaBanks.name, title: ideaBanks.title, subtitle: ideaBanks.subtitle, headerImageUrl: ideaBanks.headerImageUrl })
-        .from(ideaBanks)
-        .where(eq(ideaBanks.id, partyRow.ideaBankId));
-      if (bankRow) branding = resolveBranding(bankRow, partyRow);
-    }
+    const branding = joined
+      ? resolveBranding(
+          { name: joined.bankName, title: joined.bankTitle, subtitle: joined.bankSubtitle, headerImageUrl: joined.bankHeaderImageUrl },
+          { title: joined.partyTitle, subtitle: joined.partySubtitle, headerImageUrl: joined.partyHeaderImageUrl },
+        )
+      : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null };
 
-    const party = partyRow ? { status: partyRow.status, startAt: partyRow.startAt, endAt: partyRow.endAt } : null;
+    const party = joined
+      ? { status: joined.partyStatus, startAt: joined.partyStartAt, endAt: joined.partyEndAt }
+      : null;
 
     if (!pairs.length) return { ...ballot, party, branding, voteCount: 0, pairs: [] };
 

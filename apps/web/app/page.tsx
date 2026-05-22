@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
@@ -16,6 +16,7 @@ function BallotHeader({
 }: {
   branding: { title: string; subtitle: string | null; headerImageUrl: string | null };
 }) {
+  if (!branding.title && !branding.subtitle && !branding.headerImageUrl) return null;
   return (
     <div className="bg-white border-b border-gray-100">
       {branding.headerImageUrl && (
@@ -27,7 +28,9 @@ function BallotHeader({
         />
       )}
       <div className="max-w-2xl mx-auto px-4 py-6">
-        <p className="text-2xl font-bold text-gray-900">{branding.title}</p>
+        {branding.title && (
+          <h1 className="text-2xl font-bold text-gray-900">{branding.title}</h1>
+        )}
         {branding.subtitle && (
           <p className="mt-1 text-gray-600">{branding.subtitle}</p>
         )}
@@ -118,6 +121,15 @@ function HomeContent() {
   const selectedBank =
     banks.find((b) => b.id === bankParam) ?? banks[0] ?? null;
 
+  // Write default bank to URL so the param is always present once banks load
+  useEffect(() => {
+    if (!bankParam && banks.length > 0 && banks[0]) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("bank", banks[0].id);
+      router.replace(`/?${params.toString()}`);
+    }
+  }, [bankParam, banks, router, searchParams]);
+
   function selectBank(id: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("bank", id);
@@ -148,10 +160,16 @@ function HomeContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 flex items-center overflow-x-auto">
+        <div
+          role="tablist"
+          aria-label="Campaigns"
+          className="max-w-4xl mx-auto px-4 flex items-center overflow-x-auto"
+        >
           {banks.map((bank) => (
             <button
               key={bank.id}
+              role="tab"
+              aria-selected={selectedBank?.id === bank.id}
               onClick={() => selectBank(bank.id)}
               className={[
                 "px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors",
@@ -163,12 +181,6 @@ function HomeContent() {
               {bank.name}
             </button>
           ))}
-          <a
-            href="/admin"
-            className="ml-auto px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap border-b-2 border-transparent -mb-px"
-          >
-            Admin →
-          </a>
         </div>
       </nav>
 

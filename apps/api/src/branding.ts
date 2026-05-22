@@ -17,7 +17,7 @@ export function resolveBranding(
 ): ResolvedBranding {
   return {
     title: party?.title ?? ideaBank.title ?? ideaBank.name,
-    subtitle: party?.subtitle ?? ideaBank.subtitle ?? null,
-    headerImageUrl: party?.headerImageUrl ?? ideaBank.headerImageUrl ?? null,
+    subtitle: party?.subtitle ?? ideaBank.subtitle,
+    headerImageUrl: party?.headerImageUrl ?? ideaBank.headerImageUrl,
   };
 }
