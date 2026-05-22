@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useId, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { trpc, type RouterOutput } from "@/lib/trpc";
@@ -69,23 +69,38 @@ function BrandingField({
   value,
   onChange,
   placeholder,
+  onClear,
 }: {
   label: string;
   hint?: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  onClear?: () => void;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-700 mb-0.5">{label}</label>
+      <div className="flex items-center justify-between mb-0.5">
+        <label htmlFor={id} className="block text-xs font-medium text-gray-700">{label}</label>
+        {onClear && value && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       {hint && <p className="text-xs text-gray-500 mb-1">{hint}</p>}
       <input
+        id={id}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:border-blue-500"
+        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
   );
@@ -154,9 +169,9 @@ function BankBrandingSection({ bank }: { bank: { id: string; title: string | nul
           >
             {update.isPending ? "Saving…" : "Save Branding"}
           </button>
-          {update.isSuccess && !dirty && (
-            <span className="text-xs text-green-600">Saved</span>
-          )}
+          <span role="status" aria-live="polite" className="text-xs text-green-600">
+            {update.isSuccess && !dirty ? "Saved" : ""}
+          </span>
           {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
         </div>
       </div>
@@ -1540,18 +1555,21 @@ function PartyBrandingSection({
           label="Title"
           value={title}
           onChange={setTitle}
+          onClear={() => setTitle("")}
           placeholder="Override campaign title…"
         />
         <BrandingField
           label="Subtitle"
           value={subtitle}
           onChange={setSubtitle}
+          onClear={() => setSubtitle("")}
           placeholder="Override campaign subtitle…"
         />
         <BrandingField
           label="Header Image URL"
           value={headerImageUrl}
           onChange={setHeaderImageUrl}
+          onClear={() => setHeaderImageUrl("")}
           placeholder="https://…"
         />
         {!isClosed && (
@@ -1563,9 +1581,9 @@ function PartyBrandingSection({
             >
               {update.isPending ? "Saving…" : "Save Branding"}
             </button>
-            {update.isSuccess && !dirty && (
-              <span className="text-xs text-green-600">Saved</span>
-            )}
+            <span role="status" aria-live="polite" className="text-xs text-green-600">
+              {update.isSuccess && !dirty ? "Saved" : ""}
+            </span>
             {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
           </div>
         )}
@@ -1814,7 +1832,7 @@ function BankDetail({ bankId }: { bankId: string }) {
         )}
       </div>
 
-      <BankBrandingSection bank={data} />
+      <BankBrandingSection key={data.id} bank={data} />
 
       {showAddForm && (
         <AddIdeaForm

@@ -15,8 +15,8 @@ import { sql } from "drizzle-orm";
 
 export const ideaBanks = pgTable("idea_banks", {
   id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  title: text("title"),
+  name: text("name").notNull(), // internal handle (slug-like); title is the public display value
+  title: text("title"),         // null → falls back to name on the landing page
   subtitle: text("subtitle"),
   headerImageUrl: text("header_image_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

@@ -11,8 +11,8 @@ export const partiesRouter = router({
       z.object({
         ideaBankId: z.string().uuid(),
         name: z.string().min(1).max(200),
-        title: z.string().max(200).optional(),
-        subtitle: z.string().max(500).optional(),
+        title: z.string().min(1).max(200).optional(),
+        subtitle: z.string().min(1).max(500).optional(),
         headerImageUrl: z.string().url().startsWith("https://").optional(),
         startAt: z.string().datetime().optional(),
         endAt: z.string().datetime().optional(),
@@ -39,8 +39,8 @@ export const partiesRouter = router({
       z.object({
         id: z.string().uuid(),
         name: z.string().min(1).max(200).optional(),
-        title: z.string().max(200).nullable().optional(),
-        subtitle: z.string().max(500).nullable().optional(),
+        title: z.string().min(1).max(200).nullable().optional(),
+        subtitle: z.string().min(1).max(500).nullable().optional(),
         headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
         startAt: z.string().datetime().optional(),
         endAt: z.string().datetime().nullable().optional(),

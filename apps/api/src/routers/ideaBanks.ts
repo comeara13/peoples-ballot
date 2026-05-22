@@ -11,8 +11,8 @@ export const ideaBanksRouter = router({
     .input(
       z.object({
         name: z.string().min(1).max(200),
-        title: z.string().max(200).optional(),
-        subtitle: z.string().max(500).optional(),
+        title: z.string().min(1).max(200).optional(),
+        subtitle: z.string().min(1).max(500).optional(),
         headerImageUrl: z.string().url().startsWith("https://").optional(),
       }),
     )
@@ -34,15 +34,12 @@ export const ideaBanksRouter = router({
       z.object({
         id: z.string().uuid(),
         name: z.string().min(1).max(200).optional(),
-        title: z.string().max(200).nullable().optional(),
-        subtitle: z.string().max(500).nullable().optional(),
+        title: z.string().min(1).max(200).nullable().optional(),
+        subtitle: z.string().min(1).max(500).nullable().optional(),
         headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      const [existing] = await db.select().from(ideaBanks).where(eq(ideaBanks.id, input.id));
-      if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
-
       const [updated] = await db
         .update(ideaBanks)
         .set({
@@ -54,6 +51,7 @@ export const ideaBanksRouter = router({
         .where(eq(ideaBanks.id, input.id))
         .returning();
 
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
       return updated;
     }),
 

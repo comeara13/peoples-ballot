@@ -11,13 +11,15 @@ export type ResolvedBranding = {
   headerImageUrl: string | null;
 };
 
+const nb = (s: string | null | undefined): string | null => s?.trim() || null;
+
 export function resolveBranding(
   ideaBank: BrandingSource,
   party: Omit<BrandingSource, "name"> | null,
 ): ResolvedBranding {
   return {
-    title: party?.title ?? ideaBank.title ?? ideaBank.name,
-    subtitle: party?.subtitle ?? ideaBank.subtitle,
-    headerImageUrl: party?.headerImageUrl ?? ideaBank.headerImageUrl,
+    title: nb(party?.title) ?? nb(ideaBank.title) ?? ideaBank.name,
+    subtitle: nb(party?.subtitle) ?? nb(ideaBank.subtitle),
+    headerImageUrl: nb(party?.headerImageUrl) ?? nb(ideaBank.headerImageUrl),
   };
 }

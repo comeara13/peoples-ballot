@@ -71,4 +71,29 @@ describe("resolveBranding", () => {
       headerImageUrl: null,
     });
   });
+
+  it("empty string title is treated as absent and falls back to bank.name", () => {
+    expect(resolveBranding(bank({ title: "" }), null)).toEqual({
+      title: "Default Bank",
+      subtitle: null,
+      headerImageUrl: null,
+    });
+  });
+
+  it("whitespace-only title is treated as absent and falls back to bank.name", () => {
+    expect(resolveBranding(bank({ title: "   " }), null)).toEqual({
+      title: "Default Bank",
+      subtitle: null,
+      headerImageUrl: null,
+    });
+  });
+
+  it("empty string party title falls back to bank title", () => {
+    const b = bank({ title: "Bank Title" });
+    expect(resolveBranding(b, party({ title: "" }))).toEqual({
+      title: "Bank Title",
+      subtitle: null,
+      headerImageUrl: null,
+    });
+  });
 });

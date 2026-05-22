@@ -84,17 +84,23 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
         )}
 
         <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-base font-semibold text-gray-900 mb-1">Enter your ballot ID</h2>
+          <label
+            htmlFor="ballot-id-input"
+            className="block text-base font-semibold text-gray-900 mb-1"
+          >
+            Enter your ballot ID
+          </label>
           <p className="text-sm text-gray-600 mb-4">
             You&apos;ll receive this from the event organizer.
           </p>
           <form onSubmit={handleLoad} className="space-y-3">
             <input
+              id="ballot-id-input"
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {error && <p className="text-xs text-red-600">{error}</p>}
             <button
@@ -113,27 +119,32 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
 // ─── Tabbed home view ─────────────────────────────────────────────────────────
 
 function HomeContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { data: banks = [], isLoading } = trpc.ideaBanks.list.useQuery();
 
   const bankParam = searchParams.get("bank");
-  const selectedBank =
-    banks.find((b) => b.id === bankParam) ?? banks[0] ?? null;
+  // Local state drives tab selection; initialised from the URL param so direct
+  // navigation to /?bank=<id> works. Tab switches only update local state + the
+  // URL via replaceState so the browser back button is not cluttered.
+  const [selectedId, setSelectedId] = useState<string | null>(() => bankParam);
 
-  // Write default bank to URL so the param is always present once banks load
+  const selectedBank =
+    banks.find((b) => b.id === (selectedId ?? bankParam)) ?? banks[0] ?? null;
+
+  // Sync URL param when no bank is in the URL (first visit) — URL only, no state
   useEffect(() => {
     if (!bankParam && banks.length > 0 && banks[0]) {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(window.location.search);
       params.set("bank", banks[0].id);
-      router.replace(`/?${params.toString()}`);
+      window.history.replaceState(null, "", `/?${params.toString()}`);
     }
-  }, [bankParam, banks, router, searchParams]);
+  }, [bankParam, banks]);
 
   function selectBank(id: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    setSelectedId(id);
+    const params = new URLSearchParams(window.location.search);
     params.set("bank", id);
-    router.replace(`/?${params.toString()}`);
+    window.history.replaceState(null, "", `/?${params.toString()}`);
   }
 
   if (isLoading) {
@@ -184,7 +195,7 @@ function HomeContent() {
         </div>
       </nav>
 
-      {selectedBank && <CampaignLanding bank={selectedBank} />}
+      {selectedBank && <CampaignLanding key={selectedBank.id} bank={selectedBank} />}
     </div>
   );
 }
