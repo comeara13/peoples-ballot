@@ -10,6 +10,7 @@ import {
   parties,
   postAssessmentResponses,
 } from "../db/schema";
+import { isValidSurveyValue } from "../surveyValidation";
 
 export const assessmentRouter = router({
   listQuestionsForBallot: publicProcedure
@@ -133,11 +134,8 @@ export const assessmentRouter = router({
         for (const r of input.responses) {
           const type = questionMap.get(r.questionId);
           if (!type) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
-          const valid =
-            type === "likert"
-              ? ["1", "2", "3", "4", "5"].includes(r.value)
-              : ["yes", "no"].includes(r.value);
-          if (!valid) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
+          if (!isValidSurveyValue(type, r.value))
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
         }
       }
 

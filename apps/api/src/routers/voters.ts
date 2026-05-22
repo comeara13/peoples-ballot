@@ -14,6 +14,7 @@ import {
   voterRaceEthnicity,
   voters,
 } from "../db/schema";
+import { isValidSurveyValue } from "../surveyValidation";
 
 const registerInput = z.object({
   // ballotId links the voter to their ballot immediately upon registration.
@@ -88,11 +89,7 @@ export const votersRouter = router({
           if (!type) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
           }
-          const valid =
-            type === "likert"
-              ? ["1", "2", "3", "4", "5"].includes(r.value)
-              : ["yes", "no"].includes(r.value);
-          if (!valid) {
+          if (!isValidSurveyValue(type, r.value)) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
           }
         }
