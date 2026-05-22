@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useId, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
@@ -9,10 +9,49 @@ import { SuggestIdeaSheet } from "@/components/SuggestIdeaSheet";
 
 import type { Selection, BallotState } from "@/types/ballot";
 
-// ─── Ballot ID entry ──────────────────────────────────────────────────────────
+// ─── Campaign branding header (non-sticky, used on ballot view) ───────────────
 
-function BallotEntry() {
+function BallotHeader({
+  branding,
+}: {
+  branding: { title: string; subtitle: string | null; headerImageUrl: string | null };
+}) {
+  if (!branding.title && !branding.subtitle && !branding.headerImageUrl) return null;
+  return (
+    <div className="bg-white border-b border-gray-100">
+      {branding.headerImageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={branding.headerImageUrl}
+          alt=""
+          className="w-full max-h-56 object-cover"
+        />
+      )}
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {branding.title && (
+          <h1 className="text-2xl font-bold text-gray-900">{branding.title}</h1>
+        )}
+        {branding.subtitle && (
+          <p className="mt-1 text-gray-600">{branding.subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Campaign landing (ballot ID entry for a specific bank) ───────────────────
+
+type BankBranding = {
+  id: string;
+  name: string;
+  title: string | null;
+  subtitle: string | null;
+  headerImageUrl: string | null;
+};
+
+function CampaignLanding({ bank }: { bank: BankBranding }) {
   const router = useRouter();
+  const ballotInputId = useId();
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
 
@@ -27,28 +66,137 @@ function BallotEntry() {
     router.push(`/?ballotId=${id}`);
   }
 
+  const displayTitle = bank.title ?? bank.name;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white border border-gray-200 rounded-xl p-8 w-full max-w-sm shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Load Ballot</h2>
-        <p className="text-sm text-gray-600 mb-6">Enter your ballot ID to begin voting.</p>
-        <form onSubmit={handleLoad} className="space-y-4">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {error && <p className="text-xs text-red-600">{error}</p>}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+    <div>
+      {bank.headerImageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={bank.headerImageUrl}
+          alt=""
+          className="w-full max-h-64 object-cover"
+        />
+      )}
+      <div className="max-w-lg mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-gray-900">{displayTitle}</h1>
+        {bank.subtitle && (
+          <p className="mt-2 text-lg text-gray-600">{bank.subtitle}</p>
+        )}
+
+        <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <label
+            htmlFor={ballotInputId}
+            className="block text-base font-semibold text-gray-900 mb-1"
           >
-            Load Ballot
-          </button>
-        </form>
+            Enter your ballot ID
+          </label>
+          <p className="text-sm text-gray-600 mb-4">
+            You&apos;ll receive this from the event organizer.
+          </p>
+          <form onSubmit={handleLoad} className="space-y-3">
+            <input
+              id={ballotInputId}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+            >
+              Start Voting →
+            </button>
+          </form>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Tabbed home view ─────────────────────────────────────────────────────────
+
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const { data: banks = [], isLoading } = trpc.ideaBanks.list.useQuery();
+
+  const bankParam = searchParams.get("bank");
+  // Local state drives tab selection; initialised from the URL param so direct
+  // navigation to /?bank=<id> works. Tab switches only update local state + the
+  // URL via replaceState so the browser back button is not cluttered.
+  const [selectedId, setSelectedId] = useState<string | null>(() => bankParam);
+
+  const selectedBank =
+    banks.find((b) => b.id === (selectedId ?? bankParam)) ?? banks[0] ?? null;
+
+  // Sync URL param when no bank is in the URL (first visit) — URL only, no state
+  useEffect(() => {
+    if (!bankParam && banks.length > 0 && banks[0]) {
+      const params = new URLSearchParams(window.location.search);
+      params.set("bank", banks[0].id);
+      window.history.replaceState(null, "", `/?${params.toString()}`);
+    }
+  }, [bankParam, banks]);
+
+  function selectBank(id: string) {
+    setSelectedId(id);
+    const params = new URLSearchParams(window.location.search);
+    params.set("bank", id);
+    window.history.replaceState(null, "", `/?${params.toString()}`);
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-sm text-gray-600">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!banks.length) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-sm text-gray-600 mb-3">No campaigns found.</p>
+          <a href="/admin" className="text-sm text-blue-600 hover:underline">
+            Go to Admin →
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200">
+        <div
+          role="tablist"
+          aria-label="Campaigns"
+          className="max-w-4xl mx-auto px-4 flex items-center overflow-x-auto"
+        >
+          {banks.map((bank) => (
+            <button
+              key={bank.id}
+              role="tab"
+              aria-selected={selectedBank?.id === bank.id}
+              onClick={() => selectBank(bank.id)}
+              className={[
+                "px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors",
+                selectedBank?.id === bank.id
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-gray-600 hover:text-gray-900",
+              ].join(" ")}
+            >
+              {bank.name}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {selectedBank && <CampaignLanding key={selectedBank.id} bank={selectedBank} />}
     </div>
   );
 }
@@ -111,7 +259,7 @@ function WindowFooter({
   const state = getWindowState(party);
   if (state === "closed" || state === "ended") return null;
 
-  if (!party.endAt) return null; // no end time = no footer needed
+  if (!party.endAt) return null;
 
   return (
     <div className="text-center text-xs text-gray-500 pb-4">
@@ -199,7 +347,6 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     onSuccess: () => utils.ballots.getById.invalidate({ id: ballotId }),
   });
 
-  // Show registration form if this ballot hasn't been claimed by a voter yet.
   if (!isLoading && ballot && !ballot.voterId) {
     return (
       <VoterRegistrationForm
@@ -233,7 +380,6 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
-  // Just submitted — show results immediately from local state (no refetch wait)
   if (submitMutation.isSuccess) {
     const pairsWithVotes = ballot.pairs.map((p) => ({
       ...p,
@@ -257,7 +403,6 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
-  // Already fully voted — show read-only results
   if (ballot.voteCount > 0 && ballot.voteCount === ballot.pairs.length) {
     return (
       <div className="min-h-screen bg-gray-50 pb-8">
@@ -277,7 +422,6 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
-  // Voting UI
   const windowState = getWindowState(ballot.party);
   const windowClosed = windowState !== "open";
 
@@ -308,11 +452,13 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      <BallotHeader branding={ballot.branding} />
+
       <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
-          <h1 className="text-base font-semibold text-gray-900 leading-snug">
+          <h2 className="text-base font-semibold text-gray-900 leading-snug">
             Which idea would best help build a community that works for all of us?
-          </h1>
+          </h2>
           <button
             onClick={() => router.push("/")}
             className="text-xs text-gray-500 hover:text-gray-700 shrink-0"
@@ -394,7 +540,7 @@ function BallotPageContent() {
   const searchParams = useSearchParams();
   const ballotId = searchParams.get("ballotId");
 
-  if (!ballotId) return <BallotEntry />;
+  if (!ballotId) return <HomeContent />;
   return <LiveBallot ballotId={ballotId} />;
 }
 

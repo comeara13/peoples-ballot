@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useId, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { trpc, type RouterOutput } from "@/lib/trpc";
@@ -60,6 +60,134 @@ type Idea = {
   translations: Translation[];
   tags: Tag[];
 };
+
+// ─── Branding field helper ────────────────────────────────────────────────────
+
+function BrandingField({
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+  onClear,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  onClear?: () => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-0.5">
+        <label htmlFor={id} className="block text-xs font-medium text-gray-700">{label}</label>
+        {onClear && value && !disabled && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {hint && <p className="text-xs text-gray-500 mb-1">{hint}</p>}
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+      />
+    </div>
+  );
+}
+
+// ─── Bank Branding Section ────────────────────────────────────────────────────
+
+function BankBrandingSection({ bank }: { bank: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null } }) {
+  const utils = trpc.useUtils();
+  const [title, setTitle] = useState(bank.title ?? "");
+  const [subtitle, setSubtitle] = useState(bank.subtitle ?? "");
+  const [headerImageUrl, setHeaderImageUrl] = useState(bank.headerImageUrl ?? "");
+  const [showSaved, setShowSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const update = trpc.ideaBanks.update.useMutation({
+    onSuccess: (data) => {
+      utils.ideaBanks.getById.invalidate({ id: bank.id });
+      setTitle(data.title ?? "");
+      setSubtitle(data.subtitle ?? "");
+      setHeaderImageUrl(data.headerImageUrl ?? "");
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      setShowSaved(true);
+      savedTimer.current = setTimeout(() => setShowSaved(false), 2500);
+    },
+  });
+
+  const dirty =
+    title !== (bank.title ?? "") ||
+    subtitle !== (bank.subtitle ?? "") ||
+    headerImageUrl !== (bank.headerImageUrl ?? "");
+
+  function save() {
+    update.mutate({
+      id: bank.id,
+      title: title.trim() || null,
+      subtitle: subtitle.trim() || null,
+      headerImageUrl: headerImageUrl.trim() || null,
+    });
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+      <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
+        Campaign Branding
+      </h2>
+      <div className="space-y-3">
+        <BrandingField
+          label="Title"
+          value={title}
+          onChange={setTitle}
+          placeholder="Displayed on the landing page (defaults to bank name)"
+        />
+        <BrandingField
+          label="Subtitle"
+          value={subtitle}
+          onChange={setSubtitle}
+          placeholder="Optional tagline or description"
+        />
+        <BrandingField
+          label="Header Image URL"
+          value={headerImageUrl}
+          onChange={setHeaderImageUrl}
+          placeholder="https://…"
+        />
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={save}
+            disabled={!dirty || update.isPending}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+          >
+            {update.isPending ? "Saving…" : "Save Branding"}
+          </button>
+          <span role="status" aria-live="polite" className="text-xs text-green-600">
+            {showSaved ? "Saved" : ""}
+          </span>
+          {update.error && (
+            <span role="alert" className="text-xs text-red-600">{update.error.message}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Create Bank Form ─────────────────────────────────────────────────────────
 
@@ -1402,6 +1530,103 @@ function PartySection({ bankId }: { bankId: string }) {
   );
 }
 
+// ─── Party Branding Section ───────────────────────────────────────────────────
+
+function PartyBrandingSection({
+  party,
+  bankId,
+  isClosed,
+}: {
+  party: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null };
+  bankId: string;
+  isClosed: boolean;
+}) {
+  const utils = trpc.useUtils();
+  const [title, setTitle] = useState(party.title ?? "");
+  const [subtitle, setSubtitle] = useState(party.subtitle ?? "");
+  const [headerImageUrl, setHeaderImageUrl] = useState(party.headerImageUrl ?? "");
+  const [showSaved, setShowSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const update = trpc.parties.update.useMutation({
+    onSuccess: (data) => {
+      utils.parties.listByBank.invalidate({ ideaBankId: bankId });
+      setTitle(data.title ?? "");
+      setSubtitle(data.subtitle ?? "");
+      setHeaderImageUrl(data.headerImageUrl ?? "");
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      setShowSaved(true);
+      savedTimer.current = setTimeout(() => setShowSaved(false), 2500);
+    },
+  });
+
+  const dirty =
+    title !== (party.title ?? "") ||
+    subtitle !== (party.subtitle ?? "") ||
+    headerImageUrl !== (party.headerImageUrl ?? "");
+
+  function save() {
+    update.mutate({
+      id: party.id,
+      title: title.trim() || null,
+      subtitle: subtitle.trim() || null,
+      headerImageUrl: headerImageUrl.trim() || null,
+    });
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-white mb-6">
+      <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+        Branding Override
+      </h2>
+      <p className="text-xs text-gray-500 mb-3">Leave blank to inherit from the campaign.</p>
+      <div className="space-y-3">
+        <BrandingField
+          label="Title"
+          value={title}
+          onChange={setTitle}
+          onClear={isClosed ? undefined : () => setTitle("")}
+          placeholder="Override campaign title…"
+          disabled={isClosed}
+        />
+        <BrandingField
+          label="Subtitle"
+          value={subtitle}
+          onChange={setSubtitle}
+          onClear={isClosed ? undefined : () => setSubtitle("")}
+          placeholder="Override campaign subtitle…"
+          disabled={isClosed}
+        />
+        <BrandingField
+          label="Header Image URL"
+          value={headerImageUrl}
+          onChange={setHeaderImageUrl}
+          onClear={isClosed ? undefined : () => setHeaderImageUrl("")}
+          placeholder="https://…"
+          disabled={isClosed}
+        />
+        {!isClosed && (
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={save}
+              disabled={!dirty || update.isPending}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-40 font-medium"
+            >
+              {update.isPending ? "Saving…" : "Save Branding"}
+            </button>
+            <span role="status" aria-live="polite" className="text-xs text-green-600">
+              {showSaved ? "Saved" : ""}
+            </span>
+            {update.error && (
+              <span role="alert" className="text-xs text-red-600">{update.error.message}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Party Detail (shown when partyId is in query params) ────────────────────
 
 function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
@@ -1546,6 +1771,11 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
         </div>
       )}
 
+      {/* Party branding override */}
+      {party && (
+        <PartyBrandingSection key={party.id} party={party} bankId={bankId} isClosed={isClosed} />
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-900">Ballots</h2>
         {!isClosed && (
@@ -1636,6 +1866,8 @@ function BankDetail({ bankId }: { bankId: string }) {
           </button>
         )}
       </div>
+
+      <BankBrandingSection key={data.id} bank={data} />
 
       {showAddForm && (
         <AddIdeaForm
