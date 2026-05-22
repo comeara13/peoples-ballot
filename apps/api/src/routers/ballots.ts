@@ -7,6 +7,7 @@ import {
   ballots,
   ballotPairs,
   ideas,
+  ideaBanks,
   parties,
   prompts,
   ideaTranslations,
@@ -14,6 +15,7 @@ import {
 } from "../db/schema";
 import { buildPairWeights, weightedSample } from "../catchup";
 import { checkPartyWindow } from "../partyWindow";
+import { resolveBranding } from "../branding";
 
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
 
@@ -152,12 +154,35 @@ export const ballotsRouter = router({
       .where(eq(ballotPairs.ballotId, input.id))
       .orderBy(ballotPairs.position);
 
-    const [party] = await db
-      .select({ status: parties.status, startAt: parties.startAt, endAt: parties.endAt })
+    const [joined] = await db
+      .select({
+        partyStatus: parties.status,
+        partyStartAt: parties.startAt,
+        partyEndAt: parties.endAt,
+        partyTitle: parties.title,
+        partySubtitle: parties.subtitle,
+        partyHeaderImageUrl: parties.headerImageUrl,
+        bankName: ideaBanks.name,
+        bankTitle: ideaBanks.title,
+        bankSubtitle: ideaBanks.subtitle,
+        bankHeaderImageUrl: ideaBanks.headerImageUrl,
+      })
       .from(parties)
+      .innerJoin(ideaBanks, eq(ideaBanks.id, parties.ideaBankId))
       .where(eq(parties.id, ballot.partyId));
 
-    if (!pairs.length) return { ...ballot, party: party ?? null, voteCount: 0, pairs: [] };
+    const branding = joined
+      ? resolveBranding(
+          { name: joined.bankName, title: joined.bankTitle, subtitle: joined.bankSubtitle, headerImageUrl: joined.bankHeaderImageUrl },
+          { title: joined.partyTitle, subtitle: joined.partySubtitle, headerImageUrl: joined.partyHeaderImageUrl },
+        )
+      : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null };
+
+    const party = joined
+      ? { status: joined.partyStatus, startAt: joined.partyStartAt, endAt: joined.partyEndAt }
+      : null;
+
+    if (!pairs.length) return { ...ballot, party, branding, voteCount: 0, pairs: [] };
 
     const ideaIds = [...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId]))];
 
@@ -182,7 +207,8 @@ export const ballotsRouter = router({
 
     return {
       ...ballot,
-      party: party ?? null,
+      party,
+      branding,
       voteCount: votesList.length,
       pairs: pairs.map((pair) => ({
         ...pair,
