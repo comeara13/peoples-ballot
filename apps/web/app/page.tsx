@@ -389,7 +389,7 @@ function PostVoteSurvey({
                       <span>Strongly Disagree</span>
                       <span>Strongly Agree</span>
                     </div>
-                    <div className="flex gap-2" role="group" aria-label={q.text}>
+                    <div className="flex gap-2" role="radiogroup" aria-label={q.text}>
                       {["1", "2", "3", "4", "5"].map((val) => {
                         const selected = answers[q.id] === val;
                         return (
@@ -415,7 +415,7 @@ function PostVoteSurvey({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex gap-3" role="group" aria-label={q.text}>
+                  <div className="flex gap-3" role="radiogroup" aria-label={q.text}>
                     {["yes", "no"].map((val) => {
                       const selected = answers[q.id] === val;
                       return (
