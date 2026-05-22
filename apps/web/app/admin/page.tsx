@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/clerk-react";
 import { Command } from "cmdk";
 import { trpc, type RouterOutput } from "@/lib/trpc";
 
