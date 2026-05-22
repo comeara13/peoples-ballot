@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth, UserButton } from "@clerk/nextjs";
 
 export function Nav() {
   const pathname = usePathname();
+  const { isSignedIn } = useAuth();
 
   return (
     <nav className="border-b border-gray-200 bg-white sticky top-0 z-10">
@@ -21,16 +23,30 @@ export function Nav() {
           >
             Ballot
           </Link>
-          <Link
-            href="/admin"
-            className={`px-3 py-1.5 text-sm rounded font-medium transition-colors ${
-              pathname?.startsWith("/admin")
-                ? "bg-blue-600 text-white"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-            }`}
-          >
-            Admin
-          </Link>
+          {isSignedIn && (
+            <Link
+              href="/admin"
+              className={`px-3 py-1.5 text-sm rounded font-medium transition-colors ${
+                pathname?.startsWith("/admin")
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              }`}
+            >
+              Admin
+            </Link>
+          )}
+        </div>
+        <div className="ml-auto">
+          {isSignedIn ? (
+            <UserButton />
+          ) : (
+            <Link
+              href="/sign-in"
+              className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       </div>
     </nav>
