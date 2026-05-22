@@ -52,7 +52,7 @@ function GlossaryTermRow({ term, onArchive, onUnarchive, onUpdate }: {
   if (archived) {
     return (
       <div className="flex items-center justify-between py-2 px-3 rounded-lg border border-dashed border-gray-200 bg-gray-50">
-        <span className="text-sm text-gray-400 line-through">{term.title}</span>
+        <span className="text-sm text-gray-500 line-through">{term.title}</span>
         <button
           onClick={() => onUnarchive(term.id)}
           className="text-xs text-gray-500 hover:text-green-700 font-medium ml-4"
