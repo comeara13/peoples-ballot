@@ -1,6 +1,13 @@
+export interface GlossaryTerm {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface Idea {
   id: string;
   text: string;
+  glossaryTerms: GlossaryTerm[];
 }
 
 export interface Pair {

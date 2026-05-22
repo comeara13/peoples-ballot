@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, inArray, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
@@ -12,6 +12,8 @@ import {
   prompts,
   ideaTranslations,
   votes,
+  glossaryTerms,
+  ideaGlossaryTerms,
 } from "../db/schema";
 import { buildPairWeights, weightedSample } from "../catchup";
 import { checkPartyWindow } from "../partyWindow";
@@ -196,6 +198,23 @@ export const ballotsRouter = router({
 
     const textById = new Map(translations.map((t) => [t.ideaId, t.text]));
 
+    const glossaryRows = await db
+      .select({
+        ideaId: ideaGlossaryTerms.ideaId,
+        termId: glossaryTerms.id,
+        title: glossaryTerms.title,
+        body: glossaryTerms.body,
+      })
+      .from(ideaGlossaryTerms)
+      .innerJoin(glossaryTerms, eq(glossaryTerms.id, ideaGlossaryTerms.termId))
+      .where(and(inArray(ideaGlossaryTerms.ideaId, ideaIds), isNull(glossaryTerms.archivedAt)));
+
+    const glossaryByIdeaId = new Map<string, { id: string; title: string; body: string }[]>();
+    for (const row of glossaryRows) {
+      if (!glossaryByIdeaId.has(row.ideaId)) glossaryByIdeaId.set(row.ideaId, []);
+      glossaryByIdeaId.get(row.ideaId)!.push({ id: row.termId, title: row.title, body: row.body });
+    }
+
     const votesList = await db
       .select()
       .from(votes)
@@ -218,6 +237,8 @@ export const ballotsRouter = router({
         ...pair,
         leftText: textById.get(pair.leftIdeaId) ?? "(no translation)",
         rightText: textById.get(pair.rightIdeaId) ?? "(no translation)",
+        leftGlossaryTerms: glossaryByIdeaId.get(pair.leftIdeaId) ?? [],
+        rightGlossaryTerms: glossaryByIdeaId.get(pair.rightIdeaId) ?? [],
         vote: voteByPairId.get(pair.id) ?? null,
       })),
     };

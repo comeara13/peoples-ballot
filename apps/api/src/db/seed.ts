@@ -2,13 +2,60 @@ import { db } from "./index";
 import {
   affiliations,
   assessmentQuestions,
+  glossaryTerms,
   ideaBanks,
+  ideaGlossaryTerms,
   ideas,
   ideaTranslations,
   parties,
   tags,
 } from "./schema";
 import { eq } from "drizzle-orm";
+
+// Glossary terms relevant to Chicago 2019 equity voting context.
+// Each entry lists the term and which idea indices (0-based into IDEAS[]) it applies to.
+const GLOSSARY: { title: string; body: string; ideaIndices: number[] }[] = [
+  {
+    title: "TIF (Tax Increment Financing)",
+    body: `A public financing method where future property-tax revenue *increases* within a designated district are set aside to fund infrastructure or development in that same district — rather than flowing to schools, parks, or other city services.\n\n**How it works in Chicago:** When a TIF district is created, the "base" tax value is frozen. As property values rise, the extra tax revenue goes into a TIF fund controlled by the mayor's office and the local alderman, outside the normal city budget process.\n\n**Why it's contested:** Critics argue TIF funds are used to subsidize wealthy developers in already-booming areas rather than underserved neighborhoods, and that they divert money from public schools and social services.`,
+    ideaIndices: [1, 19, 29],
+  },
+  {
+    title: "Returning Citizens / Returning Residents",
+    body: `People who have been released from incarceration (jail or prison) and are re-entering their communities. The term emphasizes their status as full members of society rather than defining them by past convictions.\n\n**Barriers they often face:** difficulty finding employment due to background checks, ineligibility for public housing, loss of professional licenses, and gaps in education or job skills from time spent incarcerated.\n\n**Why the language matters:** "Returning citizen" is preferred over "ex-offender" or "ex-convict" because it centers reintegration and civic participation rather than past legal status.`,
+    ideaIndices: [5, 16, 36],
+  },
+  {
+    title: "Community Benefits Agreement (CBA)",
+    body: `A legally enforceable contract between a developer and a coalition of community groups. In exchange for public subsidies, zoning variances, or other city support, the developer commits to specific community benefits.\n\n**Common provisions include:**\n- Local hiring targets and living-wage jobs\n- Affordable housing set-asides\n- Community facilities (parks, health clinics, schools)\n- Environmental protections\n\n**Limitations:** CBAs are only as strong as the coalition that negotiates them. Without an organized community, developers can offer weak or unenforceable terms.`,
+    ideaIndices: [15, 37],
+  },
+  {
+    title: "Restorative Justice",
+    body: `An approach to harm and conflict that prioritizes repairing relationships and addressing root causes rather than purely punishing offenders.\n\n**Key practices include:**\n- Victim-offender mediation (bringing harmed and responsible parties together)\n- Community circles where peers, family, and community members participate\n- Making amends through community service or restitution\n\n**Evidence:** Studies show restorative approaches reduce reoffending rates and increase victim satisfaction compared to traditional incarceration, particularly for non-violent offenses.\n\n**Contrast with retributive justice**, which focuses on punishment proportional to the offense.`,
+    ideaIndices: [36],
+  },
+  {
+    title: "Racial Equity Impact Assessment (REIA)",
+    body: `A structured process to evaluate how a proposed policy, budget, or decision will affect different racial and ethnic groups — before it is adopted.\n\n**Typically examines:**\n- Who benefits and who bears costs, broken down by race\n- Whether the policy closes or widens existing racial disparities\n- Unintended consequences for communities of color\n\n**Chicago context:** Chicago has some of the most severe racial wealth and health gaps of any major U.S. city. Proponents argue REIAs force decision-makers to make racial impact visible and accountable, rather than treating race as an afterthought.`,
+    ideaIndices: [2, 10],
+  },
+  {
+    title: "Aldermanic Prerogative",
+    body: `An informal but powerful Chicago tradition where the City Council generally defers to the local alderman on zoning, permits, and development decisions within their ward — even when those decisions affect the broader city.\n\n**How it works:** Although zoning decisions technically require full Council approval, in practice aldermen rarely vote against a colleague's wishes in their own ward. This gives individual aldermen enormous power over neighborhood development.\n\n**Criticisms:**\n- Enables corruption and pay-to-play deals (several aldermen have been convicted of related charges)\n- Can block affordable housing or community services that the broader city supports\n- Concentrates power in one person rather than the community`,
+    ideaIndices: [7],
+  },
+  {
+    title: "Accessory Dwelling Unit (ADU)",
+    body: `A secondary, self-contained housing unit located on the same lot as a primary single-family home. Also called a "granny flat," "in-law suite," "coach house," or "backyard cottage."\n\n**Types include:**\n- Basement or attic apartments within the main home\n- Garage conversions\n- Small detached cottages in the backyard\n\n**Benefits:** ADUs can provide affordable rental housing without requiring new land, generate income for homeowners, allow multigenerational living, and increase housing supply in established neighborhoods.\n\n**Chicago context:** Much of Chicago's zoning historically prohibited ADUs. Allowing them could add tens of thousands of housing units without displacing existing residents.`,
+    ideaIndices: [25],
+  },
+  {
+    title: "Bus Rapid Transit (BRT)",
+    body: `A high-frequency, high-reliability bus service that operates more like a light rail than a typical bus route.\n\n**Key features:**\n- **Dedicated lanes** — buses travel in their own lane, unaffected by car traffic\n- **Off-board fare payment** — passengers pay before boarding, reducing dwell time\n- **Level boarding** — platforms at the same height as the bus floor for faster, accessible boarding\n- **Real-time information** and enhanced stations\n\n**Why it matters:** BRT can dramatically cut travel times on congested corridors at a fraction of the cost of building a new rail line. Critics note that without truly dedicated lanes, "BRT" often delivers little improvement over ordinary bus service.`,
+    ideaIndices: [39],
+  },
+];
 
 const BANK_NAME = "Vote Equity — Chicago 2019";
 
@@ -195,6 +242,27 @@ async function seed() {
     { name: "Healthcare", type: "issue_category" },
   ]).onConflictDoNothing();
   console.log("Inserted 12 tags (6 scale, 6 issue_category)");
+
+  const insertedTerms = await db
+    .insert(glossaryTerms)
+    .values(GLOSSARY.map(({ title, body }) => ({ title, body })))
+    .onConflictDoNothing()
+    .returning();
+  console.log(`Inserted ${insertedTerms.length} glossary terms`);
+
+  const ideaLinks: { ideaId: string; termId: string }[] = [];
+  for (let gi = 0; gi < GLOSSARY.length; gi++) {
+    const term = insertedTerms[gi];
+    if (!term) continue;
+    for (const ideaIdx of GLOSSARY[gi].ideaIndices) {
+      const idea = inserted[ideaIdx];
+      if (idea) ideaLinks.push({ ideaId: idea.id, termId: term.id });
+    }
+  }
+  if (ideaLinks.length > 0) {
+    await db.insert(ideaGlossaryTerms).values(ideaLinks).onConflictDoNothing();
+  }
+  console.log(`Linked ${ideaLinks.length} idea↔glossary-term associations`);
 
   console.log("Done.");
   process.exit(0);

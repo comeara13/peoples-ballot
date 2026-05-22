@@ -3,7 +3,7 @@ import { eq, count, inArray, or, and, ne } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
-import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes, ideaTags, tags } from "../db/schema";
+import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes, ideaTags, tags, glossaryTerms, ideaGlossaryTerms } from "../db/schema";
 import { computeScore } from "../scoring";
 
 export const ideaBanksRouter = router({
@@ -98,6 +98,15 @@ export const ideaBanksRouter = router({
             .where(inArray(ideaTags.ideaId, ideaIds))
         : [];
 
+    const ideaGlossaryRows =
+      ideaIds.length > 0
+        ? await db
+            .select({ ideaId: ideaGlossaryTerms.ideaId, term: glossaryTerms })
+            .from(ideaGlossaryTerms)
+            .innerJoin(glossaryTerms, eq(glossaryTerms.id, ideaGlossaryTerms.termId))
+            .where(inArray(ideaGlossaryTerms.ideaId, ideaIds))
+        : [];
+
     // Fetch ballot_pairs involving any of this bank's ideas
     const pairsForIdeas =
       ideaIds.length > 0
@@ -153,6 +162,7 @@ export const ideaBanksRouter = router({
             voteCount: w + l,
             translations: translations.filter((t) => t.ideaId === idea.id),
             tags: ideaTagRows.filter((r) => r.ideaId === idea.id).map((r) => r.tag),
+            glossaryTerms: ideaGlossaryRows.filter((r) => r.ideaId === idea.id).map((r) => r.term),
           };
         })
         .sort((a, b) => b.score - a.score || b.wins - a.wins),
