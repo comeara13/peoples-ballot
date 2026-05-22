@@ -1309,6 +1309,8 @@ function PostVoteSection({ bank }: { bank: { id: string; postVoteMessage: string
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
+
   const update = trpc.ideaBanks.update.useMutation({
     onSuccess: (data) => {
       utils.ideaBanks.getById.invalidate({ id: bank.id });

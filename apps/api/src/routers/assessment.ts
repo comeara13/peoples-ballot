@@ -40,8 +40,10 @@ export const assessmentRouter = router({
         .select()
         .from(assessmentQuestions)
         .where(
-          eq(assessmentQuestions.ideaBankId, input.ideaBankId) &&
+          and(
+            eq(assessmentQuestions.ideaBankId, input.ideaBankId),
             eq(assessmentQuestions.stage, input.stage),
+          ),
         )
         .orderBy(asc(assessmentQuestions.position), asc(assessmentQuestions.createdAt)),
     ),
@@ -120,23 +122,21 @@ export const assessmentRouter = router({
           ),
         );
 
-      if (bankQuestions.length > 0) {
-        const questionMap = new Map(bankQuestions.map((q) => [q.id, q.type]));
-        const answeredIds = new Set(input.responses.map((r) => r.questionId));
+      const questionMap = new Map(bankQuestions.map((q) => [q.id, q.type]));
+      const answeredIds = new Set(input.responses.map((r) => r.questionId));
 
-        if (!bankQuestions.every((q) => answeredIds.has(q.id))) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "All survey questions must be answered.",
-          });
-        }
+      if (bankQuestions.length > 0 && !bankQuestions.every((q) => answeredIds.has(q.id))) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "All survey questions must be answered.",
+        });
+      }
 
-        for (const r of input.responses) {
-          const type = questionMap.get(r.questionId);
-          if (!type) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
-          if (!isValidSurveyValue(type, r.value))
-            throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
-        }
+      for (const r of input.responses) {
+        const type = questionMap.get(r.questionId);
+        if (!type) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
+        if (!isValidSurveyValue(type, r.value))
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
       }
 
       if (input.responses.length > 0) {
@@ -171,12 +171,15 @@ export const assessmentRouter = router({
 
       if (questions.length === 0) return [];
 
+      const responseTable =
+        input.stage === "post" ? postAssessmentResponses : assessmentResponses;
+
       return Promise.all(
         questions.map(async (q) => {
           const responses = await db
-            .select({ value: assessmentResponses.value })
-            .from(assessmentResponses)
-            .where(eq(assessmentResponses.questionId, q.id));
+            .select({ value: responseTable.value })
+            .from(responseTable)
+            .where(eq(responseTable.questionId, q.id));
 
           const responseCount = responses.length;
 

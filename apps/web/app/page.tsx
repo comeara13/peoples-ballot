@@ -337,8 +337,6 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
 
 // ─── Post-vote survey ─────────────────────────────────────────────────────────
 
-type SurveyQuestion = { id: string; text: string; type: "likert" | "yes_no" };
-
 function PostVoteSurvey({
   ballotId,
   postVoteMessage,
@@ -356,8 +354,8 @@ function PostVoteSurvey({
   const submit = trpc.assessment.submitPostVoteResponses.useMutation({ onSuccess: onComplete });
 
   const allAnswered =
-    (questions as SurveyQuestion[]).length === 0 ||
-    (questions as SurveyQuestion[]).every((q) => answers[q.id] !== undefined);
+    questions.length === 0 ||
+    questions.every((q) => answers[q.id] !== undefined);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -378,11 +376,11 @@ function PostVoteSurvey({
           <p className="text-lg font-semibold text-gray-900">{postVoteMessage}</p>
         </div>
 
-        {!isLoading && (questions as SurveyQuestion[]).length > 0 && (
+        {!isLoading && questions.length > 0 && (
           <form onSubmit={handleSubmit} className="space-y-6">
             <h2 className="text-base font-semibold text-gray-900">A few quick questions</h2>
 
-            {(questions as SurveyQuestion[]).map((q) => (
+            {questions.map((q) => (
               <div key={q.id}>
                 <p className="text-sm text-gray-800 mb-3">{q.text}</p>
                 {q.type === "likert" ? (
