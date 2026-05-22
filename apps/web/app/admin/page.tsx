@@ -2101,7 +2101,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
     return (
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-8 text-sm text-gray-600">
-          {!isLoaded ? "Loading…" : "Redirecting…"}
+          {!isLoaded ? "Loading…" : isSignedIn && !isAdmin ? "You don't have permission to access this page." : "Redirecting…"}
         </div>
       </main>
     );
