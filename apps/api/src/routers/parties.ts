@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { eq, desc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import { parties, ballots, ballotPairs, votes } from "../db/schema";
 
 export const partiesRouter = router({
-  create: publicProcedure
+  create: adminProcedure
     .input(
       z.object({
         ideaBankId: z.string().uuid(),
@@ -28,7 +28,7 @@ export const partiesRouter = router({
       return party;
     }),
 
-  update: publicProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -56,7 +56,7 @@ export const partiesRouter = router({
       return updated;
     }),
 
-  listByBank: publicProcedure
+  listByBank: adminProcedure
     .input(z.object({ ideaBankId: z.string().uuid() }))
     .query(async ({ input }) => {
       return db
@@ -79,7 +79,7 @@ export const partiesRouter = router({
         .orderBy(desc(parties.createdAt));
     }),
 
-  close: publicProcedure.input(z.object({ id: z.string().uuid() })).mutation(async ({ input }) => {
+  close: adminProcedure.input(z.object({ id: z.string().uuid() })).mutation(async ({ input }) => {
     const [party] = await db.select().from(parties).where(eq(parties.id, input.id));
 
     if (!party) throw new TRPCError({ code: "NOT_FOUND" });
