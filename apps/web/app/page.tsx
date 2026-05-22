@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useId, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
@@ -51,6 +51,7 @@ type BankBranding = {
 
 function CampaignLanding({ bank }: { bank: BankBranding }) {
   const router = useRouter();
+  const ballotInputId = useId();
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
 
@@ -85,7 +86,7 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
 
         <div className="mt-8 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <label
-            htmlFor="ballot-id-input"
+            htmlFor={ballotInputId}
             className="block text-base font-semibold text-gray-900 mb-1"
           >
             Enter your ballot ID
@@ -95,7 +96,7 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
           </p>
           <form onSubmit={handleLoad} className="space-y-3">
             <input
-              id="ballot-id-input"
+              id={ballotInputId}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -455,9 +456,9 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
 
       <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
-          <h1 className="text-base font-semibold text-gray-900 leading-snug">
+          <h2 className="text-base font-semibold text-gray-900 leading-snug">
             Which idea would best help build a community that works for all of us?
-          </h1>
+          </h2>
           <button
             onClick={() => router.push("/")}
             className="text-xs text-gray-500 hover:text-gray-700 shrink-0"

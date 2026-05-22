@@ -18,7 +18,7 @@ export function resolveBranding(
   party: Omit<BrandingSource, "name"> | null,
 ): ResolvedBranding {
   return {
-    title: nb(party?.title) ?? nb(ideaBank.title) ?? ideaBank.name,
+    title: nb(party?.title) ?? nb(ideaBank.title) ?? nb(ideaBank.name) ?? "Untitled",
     subtitle: nb(party?.subtitle) ?? nb(ideaBank.subtitle),
     headerImageUrl: nb(party?.headerImageUrl) ?? nb(ideaBank.headerImageUrl),
   };
