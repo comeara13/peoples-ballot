@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, isNull, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import { TAG_TYPES, tags } from "../db/schema";
 
@@ -25,7 +25,7 @@ export const tagsRouter = router({
         .orderBy(tags.type, tags.name);
     }),
 
-  create: publicProcedure
+  create: adminProcedure
     .input(
       z.object({
         name: z.string().min(1).max(100).trim(),
@@ -49,7 +49,7 @@ export const tagsRouter = router({
       return row;
     }),
 
-  archive: publicProcedure
+  archive: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const [row] = await db
@@ -63,7 +63,7 @@ export const tagsRouter = router({
       return row;
     }),
 
-  unarchive: publicProcedure
+  unarchive: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const [row] = await db

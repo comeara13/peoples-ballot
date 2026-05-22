@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import {
   ballots,
@@ -20,7 +20,7 @@ import { resolveBranding } from "../branding";
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
 
 export const ballotsRouter = router({
-  generate: publicProcedure
+  generate: adminProcedure
     .input(
       z.object({
         partyId: z.string().uuid(),
@@ -123,7 +123,7 @@ export const ballotsRouter = router({
       });
     }),
 
-  listByParty: publicProcedure
+  listByParty: adminProcedure
     .input(z.object({ partyId: z.string().uuid() }))
     .query(async ({ input }) => {
       return db
@@ -143,7 +143,7 @@ export const ballotsRouter = router({
         .orderBy(desc(ballots.createdAt));
     }),
 
-  getById: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
+  getById: adminProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
     const [ballot] = await db.select().from(ballots).where(eq(ballots.id, input.id));
 
     if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });

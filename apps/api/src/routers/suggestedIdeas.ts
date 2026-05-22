@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { count, desc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import { ballots, parties, suggestedIdeas, voters, suggestionTags, tags, suggestionIdeaLinks } from "../db/schema";
 import { checkPartyWindow } from "../partyWindow";
@@ -68,7 +68,7 @@ export const suggestedIdeasRouter = router({
       return suggestion;
     }),
 
-  listByParty: publicProcedure
+  listByParty: adminProcedure
     .input(z.object({ partyId: z.string().uuid() }))
     .query(async ({ input }) => {
       const rows = await db
@@ -89,7 +89,7 @@ export const suggestedIdeasRouter = router({
       return attachLinkCounts(await attachTagsToSuggestions(rows));
     }),
 
-  listByBank: publicProcedure
+  listByBank: adminProcedure
     .input(z.object({ ideaBankId: z.string().uuid() }))
     .query(async ({ input }) => {
       const rows = await db

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import {
   affiliations,
@@ -142,7 +142,7 @@ export const votersRouter = router({
     });
   }),
 
-  getById: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
+  getById: adminProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
     const [voter] = await db.select().from(voters).where(eq(voters.id, input.id));
 
     if (!voter) throw new TRPCError({ code: "NOT_FOUND" });

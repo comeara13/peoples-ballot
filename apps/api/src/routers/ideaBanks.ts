@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { eq, count, inArray, or, and, ne } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import { ideaBanks, ideas, ideaTranslations, ballotPairs, votes, ideaTags, tags } from "../db/schema";
 import { computeScore } from "../scoring";
 
 export const ideaBanksRouter = router({
-  create: publicProcedure
+  create: adminProcedure
     .input(
       z.object({
         name: z.string().trim().min(1).max(200),
@@ -29,7 +29,7 @@ export const ideaBanksRouter = router({
       return bank;
     }),
 
-  update: publicProcedure
+  update: adminProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -72,7 +72,7 @@ export const ideaBanksRouter = router({
       .orderBy(ideaBanks.createdAt);
   }),
 
-  getById: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
+  getById: adminProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
     const [bank] = await db.select().from(ideaBanks).where(eq(ideaBanks.id, input.id));
 
     if (!bank) throw new TRPCError({ code: "NOT_FOUND" });
@@ -156,14 +156,14 @@ export const ideaBanksRouter = router({
     };
   }),
 
-  createIdea: publicProcedure
+  createIdea: adminProcedure
     .input(z.object({ ideaBankId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const [idea] = await db.insert(ideas).values(input).returning();
       return idea;
     }),
 
-  setIdeaTags: publicProcedure
+  setIdeaTags: adminProcedure
     .input(z.object({ ideaId: z.string().uuid(), tagIds: z.array(z.string().uuid()) }))
     .mutation(async ({ input }) => {
       await db.transaction(async (tx) => {
@@ -176,7 +176,7 @@ export const ideaBanksRouter = router({
       });
     }),
 
-  upsertTranslation: publicProcedure
+  upsertTranslation: adminProcedure
     .input(
       z.object({
         ideaId: z.string().uuid(),

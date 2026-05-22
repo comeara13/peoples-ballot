@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, eq, ne, notExists, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import {
   suggestionIdeaLinks,
@@ -11,7 +11,7 @@ import {
 } from "../db/schema";
 
 export const suggestionLinksRouter = router({
-  link: publicProcedure
+  link: adminProcedure
     .input(z.object({ suggestionId: z.string().uuid(), ideaId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const [suggestion] = await db
@@ -35,7 +35,7 @@ export const suggestionLinksRouter = router({
         .onConflictDoNothing();
     }),
 
-  unlink: publicProcedure
+  unlink: adminProcedure
     .input(z.object({ suggestionId: z.string().uuid(), ideaId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       await db
@@ -48,7 +48,7 @@ export const suggestionLinksRouter = router({
         );
     }),
 
-  listForIdea: publicProcedure
+  listForIdea: adminProcedure
     .input(z.object({ ideaId: z.string().uuid() }))
     .query(async ({ input }) => {
       const rows = await db
@@ -63,7 +63,7 @@ export const suggestionLinksRouter = router({
       return rows;
     }),
 
-  listForSuggestion: publicProcedure
+  listForSuggestion: adminProcedure
     .input(z.object({ suggestionId: z.string().uuid() }))
     .query(async ({ input }) => {
       const rows = await db
@@ -81,7 +81,7 @@ export const suggestionLinksRouter = router({
       return rows;
     }),
 
-  candidateSuggestions: publicProcedure
+  candidateSuggestions: adminProcedure
     .input(z.object({ ideaId: z.string().uuid() }))
     .query(async ({ input }) => {
       const alreadyLinked = db
@@ -107,7 +107,7 @@ export const suggestionLinksRouter = router({
         );
     }),
 
-  candidateIdeas: publicProcedure
+  candidateIdeas: adminProcedure
     .input(z.object({ suggestionId: z.string().uuid() }))
     .query(async ({ input }) => {
       const alreadyLinked = db

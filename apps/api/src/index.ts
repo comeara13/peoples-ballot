@@ -1,12 +1,13 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./routers";
+import { buildContext } from "./auth";
 
 const PORT = parseInt(process.env.PORT ?? "3001");
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
 Bun.serve({
@@ -26,7 +27,7 @@ Bun.serve({
       endpoint: "/trpc",
       req,
       router: appRouter,
-      createContext: () => ({}),
+      createContext: ({ req }) => buildContext(req),
     }).then((res) => {
       const headers = new Headers(res.headers);
       Object.entries(CORS_HEADERS).forEach(([k, v]) => headers.set(k, v));
