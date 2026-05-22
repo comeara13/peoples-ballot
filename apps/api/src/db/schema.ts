@@ -19,6 +19,7 @@ export const ideaBanks = pgTable("idea_banks", {
   title: text("title"),         // null → falls back to name on the landing page
   subtitle: text("subtitle"),
   headerImageUrl: text("header_image_url"),
+  postVoteMessage: text("post_vote_message"), // null → defaults to "Thank you for voting!"
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -311,8 +312,9 @@ export const suggestionIdeaLinks = pgTable(
   ],
 );
 
-// Pre-assessment questions configured per idea bank. Shown at the bottom of the voter
-// registration form; voters answer before accessing the ballot pairs.
+// Survey questions configured per idea bank.
+// stage="pre"  → shown on the voter registration form (before voting)
+// stage="post" → shown after ballot submission
 export const assessmentQuestions = pgTable("assessment_questions", {
   id: uuid("id").defaultRandom().primaryKey(),
   ideaBankId: uuid("idea_bank_id")
@@ -320,6 +322,7 @@ export const assessmentQuestions = pgTable("assessment_questions", {
     .notNull(),
   text: text("text").notNull(),
   type: text("type", { enum: ["likert", "yes_no"] }).notNull(),
+  stage: text("stage", { enum: ["pre", "post"] }).default("pre").notNull(),
   position: integer("position").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -337,6 +340,24 @@ export const assessmentResponses = pgTable(
       .references(() => assessmentQuestions.id, { onDelete: "cascade" })
       .notNull(),
     // "1"–"5" for likert, "yes"/"no" for yes_no
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.ballotId, t.questionId)],
+);
+
+// Post-vote survey responses — same questions as pre-vote but collected after ballot submission.
+// Kept separate from assessmentResponses so pre/post analysis stays clean.
+export const postAssessmentResponses = pgTable(
+  "post_assessment_responses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ballotId: uuid("ballot_id")
+      .references(() => ballots.id, { onDelete: "cascade" })
+      .notNull(),
+    questionId: uuid("question_id")
+      .references(() => assessmentQuestions.id, { onDelete: "cascade" })
+      .notNull(),
     value: text("value").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

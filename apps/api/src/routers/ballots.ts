@@ -166,6 +166,7 @@ export const ballotsRouter = router({
         bankTitle: ideaBanks.title,
         bankSubtitle: ideaBanks.subtitle,
         bankHeaderImageUrl: ideaBanks.headerImageUrl,
+        bankPostVoteMessage: ideaBanks.postVoteMessage,
       })
       .from(parties)
       .innerJoin(ideaBanks, eq(ideaBanks.id, parties.ideaBankId))
@@ -178,11 +179,13 @@ export const ballotsRouter = router({
         )
       : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null };
 
+    const postVoteMessage = joined?.bankPostVoteMessage ?? null;
+
     const party = joined
       ? { status: joined.partyStatus, startAt: joined.partyStartAt, endAt: joined.partyEndAt }
       : null;
 
-    if (!pairs.length) return { ...ballot, party, branding, voteCount: 0, pairs: [] };
+    if (!pairs.length) return { ...ballot, party, branding, postVoteMessage, voteCount: 0, pairs: [] };
 
     const ideaIds = [...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId]))];
 
@@ -209,6 +212,7 @@ export const ballotsRouter = router({
       ...ballot,
       party,
       branding,
+      postVoteMessage,
       voteCount: votesList.length,
       pairs: pairs.map((pair) => ({
         ...pair,
