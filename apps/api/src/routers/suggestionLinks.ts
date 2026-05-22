@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, inArray, notExists, sql } from "drizzle-orm";
+import { and, eq, ne, notExists, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../db";
@@ -101,7 +101,7 @@ export const suggestionLinksRouter = router({
         .where(
           and(
             eq(ideas.id, input.ideaId),
-            inArray(suggestedIdeas.status, ["pending", "approved"]),
+            ne(suggestedIdeas.status, "rejected"),
             notExists(alreadyLinked),
           ),
         );
