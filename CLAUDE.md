@@ -147,9 +147,13 @@ GH_USER=$(gh api user --jq .login)
 git push "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git" <branch>
 ```
 
-Same pattern for `git pull`, `git fetch`, or any other git network command:
+Same pattern for `git pull`, `git fetch`, or any other git network command. **Important:** fetching without a refspec only updates `FETCH_HEAD` — it does not update `origin/main`. Always specify the refspec to update the tracking branch:
 
 ```bash
+# Correct — updates origin/main so `git merge origin/main` works
+git fetch "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git" main:origin/main
+
+# Wrong — only updates FETCH_HEAD; origin/main stays stale
 git fetch "https://${GH_USER}:${TOKEN}@github.com/comeara13/all-our-ideas.git"
 ```
 
