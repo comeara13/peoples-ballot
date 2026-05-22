@@ -55,7 +55,7 @@ export const ideaBanksRouter = router({
       return updated;
     }),
 
-  list: adminProcedure.query(async () => {
+  list: publicProcedure.query(async () => {
     return db
       .select({
         id: ideaBanks.id,
