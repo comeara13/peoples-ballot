@@ -59,10 +59,7 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
 
   function handleLoad(e: React.FormEvent) {
     e.preventDefault();
-    // Guard: wait until Clerk has finished its async handshake + URL cleanup.
-    // Navigating before isLoaded risks clerk-js overwriting the new URL with
-    // its pre-captured clean URL (the "snap-back" bug).
-    if (!isLoaded) return;
+    if (!isLoaded) return; // clerk-js URL cleanup must finish before we navigate (snap-back bug)
     const id = input.trim();
     if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       setError("Please enter a valid ballot ID (UUID format).");
