@@ -95,36 +95,48 @@ export const votersRouter = router({
         }
       }
 
-      const [voter] = await tx
-        .insert(voters)
-        .values({
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
-          addressStreet: input.addressStreet,
-          addressCity: input.addressCity,
-          addressState: input.addressState,
-          addressZip: input.addressZip,
-          consentedAt: new Date(input.consentedAt),
-        })
-        .returning();
+      // Find-or-create voter by email. A returning voter (same email, different event)
+      // reuses their existing record so we don't duplicate PII rows.
+      const [existingVoter] = await tx
+        .select({ id: voters.id })
+        .from(voters)
+        .where(eq(voters.email, input.email));
 
+      let voterId: string;
+
+      if (existingVoter) {
+        voterId = existingVoter.id;
+      } else {
+        const [voter] = await tx
+          .insert(voters)
+          .values({
+            firstName: input.firstName,
+            lastName: input.lastName,
+            email: input.email,
+            addressStreet: input.addressStreet,
+            addressCity: input.addressCity,
+            addressState: input.addressState,
+            addressZip: input.addressZip,
+            consentedAt: new Date(input.consentedAt),
+          })
+          .returning();
+        voterId = voter.id;
+      }
+
+      // onConflictDoNothing handles the case where a returning voter re-selects the same
+      // categories/affiliations they already have on record.
       if (input.raceEthnicityCategories.length > 0) {
-        await tx.insert(voterRaceEthnicity).values(
-          input.raceEthnicityCategories.map((category) => ({
-            voterId: voter.id,
-            category,
-          })),
-        );
+        await tx
+          .insert(voterRaceEthnicity)
+          .values(input.raceEthnicityCategories.map((category) => ({ voterId, category })))
+          .onConflictDoNothing();
       }
 
       if (input.affiliationIds.length > 0) {
-        await tx.insert(voterAffiliations).values(
-          input.affiliationIds.map((affiliationId) => ({
-            voterId: voter.id,
-            affiliationId,
-          })),
-        );
+        await tx
+          .insert(voterAffiliations)
+          .values(input.affiliationIds.map((affiliationId) => ({ voterId, affiliationId })))
+          .onConflictDoNothing();
       }
 
       if (input.assessmentResponses.length > 0) {
@@ -138,9 +150,9 @@ export const votersRouter = router({
       }
 
       // Link voter to their ballot.
-      await tx.update(ballots).set({ voterId: voter.id }).where(eq(ballots.id, input.ballotId));
+      await tx.update(ballots).set({ voterId }).where(eq(ballots.id, input.ballotId));
 
-      return { id: voter.id };
+      return { id: voterId };
     });
   }),
 
