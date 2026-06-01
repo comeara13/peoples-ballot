@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useId, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
@@ -50,6 +51,7 @@ type BankBranding = {
 };
 
 function CampaignLanding({ bank }: { bank: BankBranding }) {
+  const { isLoaded } = useAuth();
   const router = useRouter();
   const ballotInputId = useId();
   const [input, setInput] = useState("");
@@ -57,6 +59,10 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
 
   function handleLoad(e: React.FormEvent) {
     e.preventDefault();
+    // Guard: wait until Clerk has finished its async handshake + URL cleanup.
+    // Navigating before isLoaded risks clerk-js overwriting the new URL with
+    // its pre-captured clean URL (the "snap-back" bug).
+    if (!isLoaded) return;
     const id = input.trim();
     if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       setError("Please enter a valid ballot ID (UUID format).");
@@ -106,9 +112,10 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
             {error && <p className="text-xs text-red-600">{error}</p>}
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+              disabled={!isLoaded}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Start Voting →
+              {isLoaded ? "Start Voting →" : "Loading…"}
             </button>
           </form>
         </div>
