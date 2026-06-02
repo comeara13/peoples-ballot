@@ -145,7 +145,7 @@ export const ballotsRouter = router({
         .orderBy(desc(ballots.createdAt));
     }),
 
-  getById: adminProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
+  getById: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
     const [ballot] = await db.select().from(ballots).where(eq(ballots.id, input.id));
 
     if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
