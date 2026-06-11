@@ -177,8 +177,12 @@ export const ballotsRouter = router({
       const selected = weightedSample(weighted, k);
 
       // 5. Pick a unique access code before entering the transaction.
-      // Retry loop uses a SELECT pre-check to avoid aborting the transaction on a 23505 collision.
-      // TOCTOU race is negligible given ~250k combinations and low ballot creation rate.
+      // Retry loop uses a SELECT pre-check to avoid aborting the transaction on a 23505 collision
+      // (a failed INSERT inside a Postgres tx leaves it in an aborted state; 25P02 on every
+      // subsequent statement until rollback). TOCTOU window exists: two concurrent generates
+      // could pass the SELECT check and race to INSERT the same code. If that happens the second
+      // INSERT will throw 23505 inside the transaction and surface as a 500 — acceptable given
+      // human-id@4's vocabulary produces billions of combinations and ballot creation rate is low.
       let accessCode: string | undefined;
       for (let attempt = 0; attempt < 10; attempt++) {
         const candidate = humanId({ separator: "-", capitalize: false });

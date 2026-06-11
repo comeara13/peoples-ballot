@@ -970,20 +970,22 @@ const STATUS_STYLES: Record<string, string> = {
 
 function CopyLinkButton({ accessCode }: { accessCode: string }) {
   const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  function scheduleReset() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setState("idle"), 2000);
+  }
+
   return (
     <button
       type="button"
       title="Copy ballot link"
       onClick={() => {
-        navigator.clipboard.writeText(`${window.location.origin}/?ballotId=${accessCode}`)
-          .then(() => {
-            setState("copied");
-            setTimeout(() => setState("idle"), 2000);
-          })
-          .catch(() => {
-            setState("error");
-            setTimeout(() => setState("idle"), 2000);
-          });
+        navigator.clipboard.writeText(`${window.location.origin}/?ballotId=${encodeURIComponent(accessCode)}`)
+          .then(() => { setState("copied"); scheduleReset(); })
+          .catch(() => { setState("error"); scheduleReset(); });
       }}
       className="shrink-0 flex items-center gap-1 px-3 py-3 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 transition-colors border-l border-gray-200"
     >
