@@ -17,3 +17,8 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Prevent iOS Safari from auto-zooming when inputs are focused (triggered by font-size < 16px) */
+input, textarea, select {
+  font-size: 16px;
+}
