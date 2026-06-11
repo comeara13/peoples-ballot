@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
 import { VoterRegistrationForm } from "@/components/VoterRegistrationForm";
 import { SuggestIdeaSheet } from "@/components/SuggestIdeaSheet";
+import { isBallotAccessCode } from "@/lib/ballot";
 
 import Markdown from "react-markdown";
 
@@ -71,12 +72,15 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
     e.preventDefault();
     if (!isLoaded) return; // clerk-js URL cleanup must finish before we navigate (snap-back bug)
     const id = input.trim();
-    if (!id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      setError("Please enter a valid ballot ID (UUID format).");
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isCode = isBallotAccessCode(id);
+    if (!isUuid && !isCode) {
+      setError("Please enter a valid ballot ID or access code (e.g. brave-golden-river).");
       return;
     }
     setError("");
-    router.push(`/?ballotId=${id}`);
+    const normalized = isCode ? id.toLowerCase() : id;
+    router.push(`/?ballotId=${encodeURIComponent(normalized)}`);
   }
 
   const displayTitle = bank.title ?? bank.name;
@@ -113,7 +117,7 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              placeholder="xxxxxxxx-xxxx-… or brave-golden-river"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {error && <p className="text-xs text-red-600">{error}</p>}
@@ -493,19 +497,28 @@ function PostVoteSurvey({
 function LiveBallot({ ballotId }: { ballotId: string }) {
   const router = useRouter();
   const utils = trpc.useUtils();
-  const { data: ballot, isLoading, error } = trpc.ballots.getById.useQuery({ id: ballotId });
+  const isCode = isBallotAccessCode(ballotId);
+  const byId = trpc.ballots.getById.useQuery({ id: ballotId }, { enabled: !isCode });
+  const byCode = trpc.ballots.getByCode.useQuery({ code: ballotId }, { enabled: isCode });
+  const { data: ballot, isLoading, error } = isCode ? byCode : byId;
+
+  function invalidateBallot() {
+    if (isCode) utils.ballots.getByCode.invalidate({ code: ballotId });
+    else utils.ballots.getById.invalidate({ id: ballotId });
+  }
+
   const [state, setState] = useState<BallotState>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [postSurveyDone, setPostSurveyDone] = useState(false);
   const submitMutation = trpc.ballots.submit.useMutation({
-    onSuccess: () => utils.ballots.getById.invalidate({ id: ballotId }),
+    onSuccess: invalidateBallot,
   });
 
   if (!isLoading && ballot && !ballot.voterId) {
     return (
       <VoterRegistrationForm
-        ballotId={ballotId}
-        onSuccess={() => utils.ballots.getById.invalidate({ id: ballotId })}
+        ballotId={ballot.id}
+        onSuccess={invalidateBallot}
       />
     );
   }

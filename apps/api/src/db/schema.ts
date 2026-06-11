@@ -181,6 +181,7 @@ export const ballots = pgTable(
     status: text("status", { enum: ["pending", "in_progress", "submitted"] })
       .default("pending")
       .notNull(),
+    accessCode: text("access_code").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
   },

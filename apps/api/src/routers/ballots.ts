@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { eq, desc, and, inArray, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { humanId } from "human-id";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import {
@@ -20,6 +21,102 @@ import { checkPartyWindow } from "../partyWindow";
 import { resolveBranding } from "../branding";
 
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
+
+async function fetchBallotById(id: string, prefetched?: typeof ballots.$inferSelect) {
+  const ballot = prefetched ?? (await db.select().from(ballots).where(eq(ballots.id, id)).then(([r]) => r));
+
+  if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
+
+  const pairs = await db
+    .select()
+    .from(ballotPairs)
+    .where(eq(ballotPairs.ballotId, id))
+    .orderBy(ballotPairs.position);
+
+  const [joined] = await db
+    .select({
+      partyStatus: parties.status,
+      partyStartAt: parties.startAt,
+      partyEndAt: parties.endAt,
+      partyTitle: parties.title,
+      partySubtitle: parties.subtitle,
+      partyHeaderImageUrl: parties.headerImageUrl,
+      partyQuestionHeading: parties.questionHeading,
+      bankName: ideaBanks.name,
+      bankTitle: ideaBanks.title,
+      bankSubtitle: ideaBanks.subtitle,
+      bankHeaderImageUrl: ideaBanks.headerImageUrl,
+      bankPostVoteMessage: ideaBanks.postVoteMessage,
+      bankQuestionHeading: ideaBanks.questionHeading,
+    })
+    .from(parties)
+    .innerJoin(ideaBanks, eq(ideaBanks.id, parties.ideaBankId))
+    .where(eq(parties.id, ballot.partyId));
+
+  const branding = joined
+    ? resolveBranding(
+        { name: joined.bankName, title: joined.bankTitle, subtitle: joined.bankSubtitle, headerImageUrl: joined.bankHeaderImageUrl, questionHeading: joined.bankQuestionHeading },
+        { title: joined.partyTitle, subtitle: joined.partySubtitle, headerImageUrl: joined.partyHeaderImageUrl, questionHeading: joined.partyQuestionHeading },
+      )
+    : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null, questionHeading: null as string | null };
+
+  const postVoteMessage = joined?.bankPostVoteMessage ?? null;
+
+  const party = joined
+    ? { status: joined.partyStatus, startAt: joined.partyStartAt, endAt: joined.partyEndAt }
+    : null;
+
+  if (!pairs.length) return { ...ballot, party, branding, postVoteMessage, voteCount: 0, pairs: [] };
+
+  const ideaIds = [...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId]))];
+
+  const translations = await db
+    .select({ ideaId: ideaTranslations.ideaId, text: ideaTranslations.text })
+    .from(ideaTranslations)
+    .where(and(inArray(ideaTranslations.ideaId, ideaIds), eq(ideaTranslations.language, "en")));
+
+  const textById = new Map(translations.map((t) => [t.ideaId, t.text]));
+
+  const glossaryRows = await db
+    .select({
+      ideaId: ideaGlossaryTerms.ideaId,
+      termId: glossaryTerms.id,
+      title: glossaryTerms.title,
+      body: glossaryTerms.body,
+    })
+    .from(ideaGlossaryTerms)
+    .innerJoin(glossaryTerms, eq(glossaryTerms.id, ideaGlossaryTerms.termId))
+    .where(and(inArray(ideaGlossaryTerms.ideaId, ideaIds), isNull(glossaryTerms.archivedAt)));
+
+  const glossaryByIdeaId = new Map<string, { id: string; title: string; body: string }[]>();
+  for (const row of glossaryRows) {
+    if (!glossaryByIdeaId.has(row.ideaId)) glossaryByIdeaId.set(row.ideaId, []);
+    glossaryByIdeaId.get(row.ideaId)!.push({ id: row.termId, title: row.title, body: row.body });
+  }
+
+  const votesList = await db
+    .select()
+    .from(votes)
+    .where(inArray(votes.ballotPairId, pairs.map((p) => p.id)));
+
+  const voteByPairId = new Map(votesList.map((v) => [v.ballotPairId, v]));
+
+  return {
+    ...ballot,
+    party,
+    branding,
+    postVoteMessage,
+    voteCount: votesList.length,
+    pairs: pairs.map((pair) => ({
+      ...pair,
+      leftText: textById.get(pair.leftIdeaId) ?? "(no translation)",
+      rightText: textById.get(pair.rightIdeaId) ?? "(no translation)",
+      leftGlossaryTerms: glossaryByIdeaId.get(pair.leftIdeaId) ?? [],
+      rightGlossaryTerms: glossaryByIdeaId.get(pair.rightIdeaId) ?? [],
+      vote: voteByPairId.get(pair.id) ?? null,
+    })),
+  };
+}
 
 export const ballotsRouter = router({
   generate: adminProcedure
@@ -79,12 +176,28 @@ export const ballotsRouter = router({
       const k = Math.min(input.pairCount, weighted.length);
       const selected = weightedSample(weighted, k);
 
-      // 5. Persist ballot + pairs in a transaction
+      // 5. Pick a unique access code before entering the transaction.
+      // Retry loop uses a SELECT pre-check to avoid aborting the transaction on a 23505 collision
+      // (a failed INSERT inside a Postgres tx leaves it in an aborted state; 25P02 on every
+      // subsequent statement until rollback). TOCTOU window exists: two concurrent generates
+      // could pass the SELECT check and race to INSERT the same code. If that happens the second
+      // INSERT will throw 23505 inside the transaction and surface as a 500 — acceptable given
+      // human-id@4's vocabulary produces billions of combinations and ballot creation rate is low.
+      let accessCode: string | undefined;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = humanId({ separator: "-", capitalize: false });
+        const [existing] = await db.select({ id: ballots.id }).from(ballots).where(eq(ballots.accessCode, candidate)).limit(1);
+        if (!existing) { accessCode = candidate; break; }
+      }
+      if (!accessCode) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not generate unique access code" });
+
+      // 6. Persist ballot + pairs in a transaction
       return db.transaction(async (tx) => {
         const [ballot] = await tx
           .insert(ballots)
-          .values({ partyId: input.partyId, status: "pending" })
+          .values({ partyId: input.partyId, status: "pending", accessCode })
           .returning();
+        if (!ballot) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
         for (let i = 0; i < selected.length; i++) {
           const pair = selected[i];
@@ -132,6 +245,7 @@ export const ballotsRouter = router({
         .select({
           id: ballots.id,
           status: ballots.status,
+          accessCode: ballots.accessCode,
           createdAt: ballots.createdAt,
           submittedAt: ballots.submittedAt,
           pairCount: sql<number>`COUNT(DISTINCT ${ballotPairs.id})::int`,
@@ -145,106 +259,17 @@ export const ballotsRouter = router({
         .orderBy(desc(ballots.createdAt));
     }),
 
-  getById: publicProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ input }) => {
-    const [ballot] = await db.select().from(ballots).where(eq(ballots.id, input.id));
+  getById: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(({ input }) => fetchBallotById(input.id)),
 
-    if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
-
-    const pairs = await db
-      .select()
-      .from(ballotPairs)
-      .where(eq(ballotPairs.ballotId, input.id))
-      .orderBy(ballotPairs.position);
-
-    const [joined] = await db
-      .select({
-        partyStatus: parties.status,
-        partyStartAt: parties.startAt,
-        partyEndAt: parties.endAt,
-        partyTitle: parties.title,
-        partySubtitle: parties.subtitle,
-        partyHeaderImageUrl: parties.headerImageUrl,
-        partyQuestionHeading: parties.questionHeading,
-        bankName: ideaBanks.name,
-        bankTitle: ideaBanks.title,
-        bankSubtitle: ideaBanks.subtitle,
-        bankHeaderImageUrl: ideaBanks.headerImageUrl,
-        bankPostVoteMessage: ideaBanks.postVoteMessage,
-        bankQuestionHeading: ideaBanks.questionHeading,
-      })
-      .from(parties)
-      .innerJoin(ideaBanks, eq(ideaBanks.id, parties.ideaBankId))
-      .where(eq(parties.id, ballot.partyId));
-
-    const branding = joined
-      ? resolveBranding(
-          { name: joined.bankName, title: joined.bankTitle, subtitle: joined.bankSubtitle, headerImageUrl: joined.bankHeaderImageUrl, questionHeading: joined.bankQuestionHeading },
-          { title: joined.partyTitle, subtitle: joined.partySubtitle, headerImageUrl: joined.partyHeaderImageUrl, questionHeading: joined.partyQuestionHeading },
-        )
-      : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null, questionHeading: null as string | null };
-
-    const postVoteMessage = joined?.bankPostVoteMessage ?? null;
-
-    const party = joined
-      ? { status: joined.partyStatus, startAt: joined.partyStartAt, endAt: joined.partyEndAt }
-      : null;
-
-    if (!pairs.length) return { ...ballot, party, branding, postVoteMessage, voteCount: 0, pairs: [] };
-
-    const ideaIds = [...new Set(pairs.flatMap((p) => [p.leftIdeaId, p.rightIdeaId]))];
-
-    const translations = await db
-      .select({ ideaId: ideaTranslations.ideaId, text: ideaTranslations.text })
-      .from(ideaTranslations)
-      .where(and(inArray(ideaTranslations.ideaId, ideaIds), eq(ideaTranslations.language, "en")));
-
-    const textById = new Map(translations.map((t) => [t.ideaId, t.text]));
-
-    const glossaryRows = await db
-      .select({
-        ideaId: ideaGlossaryTerms.ideaId,
-        termId: glossaryTerms.id,
-        title: glossaryTerms.title,
-        body: glossaryTerms.body,
-      })
-      .from(ideaGlossaryTerms)
-      .innerJoin(glossaryTerms, eq(glossaryTerms.id, ideaGlossaryTerms.termId))
-      .where(and(inArray(ideaGlossaryTerms.ideaId, ideaIds), isNull(glossaryTerms.archivedAt)));
-
-    const glossaryByIdeaId = new Map<string, { id: string; title: string; body: string }[]>();
-    for (const row of glossaryRows) {
-      if (!glossaryByIdeaId.has(row.ideaId)) glossaryByIdeaId.set(row.ideaId, []);
-      glossaryByIdeaId.get(row.ideaId)!.push({ id: row.termId, title: row.title, body: row.body });
-    }
-
-    const votesList = await db
-      .select()
-      .from(votes)
-      .where(
-        inArray(
-          votes.ballotPairId,
-          pairs.map((p) => p.id),
-        ),
-      );
-
-    const voteByPairId = new Map(votesList.map((v) => [v.ballotPairId, v]));
-
-    return {
-      ...ballot,
-      party,
-      branding,
-      postVoteMessage,
-      voteCount: votesList.length,
-      pairs: pairs.map((pair) => ({
-        ...pair,
-        leftText: textById.get(pair.leftIdeaId) ?? "(no translation)",
-        rightText: textById.get(pair.rightIdeaId) ?? "(no translation)",
-        leftGlossaryTerms: glossaryByIdeaId.get(pair.leftIdeaId) ?? [],
-        rightGlossaryTerms: glossaryByIdeaId.get(pair.rightIdeaId) ?? [],
-        vote: voteByPairId.get(pair.id) ?? null,
-      })),
-    };
-  }),
+  getByCode: publicProcedure
+    .input(z.object({ code: z.string().regex(/^[a-z]+-[a-z]+-[a-z]+$/i) }))
+    .query(async ({ input }) => {
+      const [ballot] = await db.select().from(ballots).where(eq(ballots.accessCode, input.code.toLowerCase()));
+      if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
+      return fetchBallotById(ballot.id, ballot);
+    }),
 
   submit: publicProcedure
     .input(
