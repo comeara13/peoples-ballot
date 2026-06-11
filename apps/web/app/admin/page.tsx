@@ -991,9 +991,12 @@ function BallotCard({
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors cursor-pointer"
       >
         <span className="font-mono text-xs text-gray-500 shrink-0 select-all">{ballot.id}</span>
         {ballot.accessCode && (
@@ -1021,7 +1024,7 @@ function BallotCard({
           {new Date(ballot.createdAt).toLocaleString()}
         </span>
         <span className="ml-auto text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-gray-100 px-4 pb-3">
