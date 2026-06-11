@@ -180,7 +180,13 @@ async function seed() {
     process.exit(0);
   }
 
-  const [bank] = await db.insert(ideaBanks).values({ name: BANK_NAME }).returning();
+  const [bank] = await db
+    .insert(ideaBanks)
+    .values({
+      name: BANK_NAME,
+      questionHeading: "Which idea would best help build a community that works for all of us?",
+    })
+    .returning();
   console.log(`Created idea bank: ${bank.id}`);
 
   const inserted = await db

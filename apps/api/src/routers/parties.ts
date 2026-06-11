@@ -42,6 +42,7 @@ export const partiesRouter = router({
         title: z.string().min(1).max(200).nullable().optional(),
         subtitle: z.string().min(1).max(500).nullable().optional(),
         headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
+        questionHeading: z.string().min(1).max(500).nullable().optional(),
         startAt: z.string().datetime().optional(),
         endAt: z.string().datetime().nullable().optional(),
       }),
@@ -59,6 +60,7 @@ export const partiesRouter = router({
           ...(input.title !== undefined && { title: input.title }),
           ...(input.subtitle !== undefined && { subtitle: input.subtitle }),
           ...(input.headerImageUrl !== undefined && { headerImageUrl: input.headerImageUrl }),
+          ...(input.questionHeading !== undefined && { questionHeading: input.questionHeading }),
           ...(input.startAt !== undefined && { startAt: new Date(input.startAt) }),
           ...(input.endAt !== undefined && { endAt: input.endAt ? new Date(input.endAt) : null }),
         })
@@ -78,6 +80,7 @@ export const partiesRouter = router({
           title: parties.title,
           subtitle: parties.subtitle,
           headerImageUrl: parties.headerImageUrl,
+          questionHeading: parties.questionHeading,
           status: parties.status,
           startAt: parties.startAt,
           endAt: parties.endAt,

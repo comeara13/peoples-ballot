@@ -14,6 +14,7 @@ export const ideaBanksRouter = router({
         title: z.string().min(1).max(200).optional(),
         subtitle: z.string().min(1).max(500).optional(),
         headerImageUrl: z.string().url().startsWith("https://").optional(),
+        questionHeading: z.string().min(1).max(500).optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -24,6 +25,7 @@ export const ideaBanksRouter = router({
           title: input.title ?? null,
           subtitle: input.subtitle ?? null,
           headerImageUrl: input.headerImageUrl ?? null,
+          questionHeading: input.questionHeading ?? null,
         })
         .returning();
       return bank;
@@ -38,6 +40,7 @@ export const ideaBanksRouter = router({
         subtitle: z.string().min(1).max(500).nullable().optional(),
         headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
         postVoteMessage: z.string().min(1).max(500).nullable().optional(),
+        questionHeading: z.string().min(1).max(500).nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -49,6 +52,7 @@ export const ideaBanksRouter = router({
           ...(input.subtitle !== undefined && { subtitle: input.subtitle }),
           ...(input.headerImageUrl !== undefined && { headerImageUrl: input.headerImageUrl }),
           ...(input.postVoteMessage !== undefined && { postVoteMessage: input.postVoteMessage }),
+          ...(input.questionHeading !== undefined && { questionHeading: input.questionHeading }),
         })
         .where(eq(ideaBanks.id, input.id))
         .returning();

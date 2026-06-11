@@ -127,6 +127,13 @@
       "when": 1779438286450,
       "tag": "0017_high_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781149289720,
+      "tag": "0018_wealthy_bullseye",
+      "breakpoints": true
     }
   ]
 }
