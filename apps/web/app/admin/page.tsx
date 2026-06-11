@@ -991,26 +991,15 @@ function BallotCard({
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-      <div
-        role="button"
-        tabIndex={0}
+      <button
         onClick={onToggle}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
       >
         <span className="font-mono text-xs text-gray-500 shrink-0 select-all">{ballot.id}</span>
         {ballot.accessCode && (
-          <button
-            type="button"
-            title="Click to copy access code"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigator.clipboard.writeText(ballot.accessCode!);
-            }}
-            className="font-mono text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-100 transition-colors shrink-0"
-          >
+          <span className="font-mono text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-0.5 shrink-0 select-all">
             {ballot.accessCode}
-          </button>
+          </span>
         )}
         <span
           className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[ballot.status] ?? STATUS_STYLES.pending}`}
@@ -1024,7 +1013,7 @@ function BallotCard({
           {new Date(ballot.createdAt).toLocaleString()}
         </span>
         <span className="ml-auto text-gray-400 text-xs">{expanded ? "▲" : "▼"}</span>
-      </div>
+      </button>
 
       {expanded && (
         <div className="border-t border-gray-100 px-4 pb-3">
