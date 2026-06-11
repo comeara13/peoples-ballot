@@ -969,7 +969,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function CopyLinkButton({ accessCode }: { accessCode: string }) {
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
   return (
     <button
       type="button"
@@ -977,18 +977,23 @@ function CopyLinkButton({ accessCode }: { accessCode: string }) {
       onClick={() => {
         navigator.clipboard.writeText(`${window.location.origin}/?ballotId=${accessCode}`)
           .then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            setState("copied");
+            setTimeout(() => setState("idle"), 2000);
           })
-          .catch(() => {});
+          .catch(() => {
+            setState("error");
+            setTimeout(() => setState("idle"), 2000);
+          });
       }}
       className="shrink-0 flex items-center gap-1 px-3 py-3 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 transition-colors border-l border-gray-200"
     >
-      {copied ? (
+      {state === "copied" ? (
         <>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 text-green-600"><path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" /></svg>
           <span className="text-green-600">Copied</span>
         </>
+      ) : state === "error" ? (
+        <span className="text-red-500">Failed</span>
       ) : (
         <>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5"><path d="M7.628 1.099a.75.75 0 0 1 .744 0l1.247.713A3.75 3.75 0 0 0 11.5 2.25h.5a1.5 1.5 0 0 1 1.5 1.5v1a3.75 3.75 0 0 0 .399 1.686l.612 1.224a.75.75 0 0 1-.668 1.09H13.5v4.5a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 2.5 13.25v-4.5H1.657a.75.75 0 0 1-.668-1.09l.612-1.224A3.75 3.75 0 0 0 2 4.75v-1A1.5 1.5 0 0 1 3.5 2.25H4a3.75 3.75 0 0 0 1.881-.438L7.128 1.1ZM6 6.5a.75.75 0 0 0 0 1.5h4a.75.75 0 0 0 0-1.5H6ZM6 9.25a.75.75 0 0 0 0 1.5h4a.75.75 0 0 0 0-1.5H6Z" /></svg>

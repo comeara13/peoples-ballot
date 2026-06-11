@@ -260,7 +260,7 @@ export const ballotsRouter = router({
     .query(({ input }) => fetchBallotById(input.id)),
 
   getByCode: publicProcedure
-    .input(z.object({ code: z.string().min(1) }))
+    .input(z.object({ code: z.string().regex(/^[a-z]+-[a-z]+-[a-z]+$/i) }))
     .query(async ({ input }) => {
       const [ballot] = await db.select().from(ballots).where(eq(ballots.accessCode, input.code.toLowerCase()));
       if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });

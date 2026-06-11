@@ -79,7 +79,8 @@ function CampaignLanding({ bank }: { bank: BankBranding }) {
       return;
     }
     setError("");
-    router.push(`/?ballotId=${encodeURIComponent(id)}`);
+    const normalized = isCode ? id.toLowerCase() : id;
+    router.push(`/?ballotId=${encodeURIComponent(normalized)}`);
   }
 
   const displayTitle = bank.title ?? bank.name;
