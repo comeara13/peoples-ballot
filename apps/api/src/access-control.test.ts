@@ -25,8 +25,8 @@ async function expectForbidden(p: Promise<unknown>) {
     await p;
     throw new Error("Expected FORBIDDEN but procedure resolved");
   } catch (e) {
-    expect(e instanceof TRPCError).toBe(true);
-    expect((e as TRPCError).code).toBe("FORBIDDEN");
+    if (!(e instanceof TRPCError)) throw e; // surface unexpected errors with their real message
+    expect(e.code).toBe("FORBIDDEN");
   }
 }
 
@@ -35,9 +35,11 @@ async function expectNotForbidden(p: Promise<unknown>) {
     await p;
   } catch (e) {
     if (e instanceof TRPCError) {
-      expect((e as TRPCError).code).not.toBe("FORBIDDEN");
+      expect(e.code).not.toBe("FORBIDDEN");
     }
-    // Non-TRPCError (e.g. DB unreachable) is never FORBIDDEN — passes implicitly
+    // Non-TRPCError (e.g. DB unreachable) is re-thrown as-is by tRPC and won't be FORBIDDEN.
+    // This means a raw Error from a public procedure bug is invisible here — intentional,
+    // since this file only tests access control, not procedure correctness.
   }
 }
 
@@ -81,6 +83,7 @@ describe("voters", () => {
 });
 
 // ── ideaBanks ────────────────────────────────────────────────────────────────
+// TODO: setIdeaActive → admin (listed in docs/auth-gates.md but not yet implemented)
 
 describe("ideaBanks", () => {
   it("list             → public", () => expectNotForbidden(anon.ideaBanks.list()));
