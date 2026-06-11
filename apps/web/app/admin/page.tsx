@@ -975,9 +975,12 @@ function CopyLinkButton({ accessCode }: { accessCode: string }) {
       type="button"
       title="Copy ballot link"
       onClick={() => {
-        navigator.clipboard.writeText(`${window.location.origin}/?ballotId=${accessCode}`);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        navigator.clipboard.writeText(`${window.location.origin}/?ballotId=${accessCode}`)
+          .then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          })
+          .catch(() => {});
       }}
       className="shrink-0 flex items-center gap-1 px-3 py-3 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 transition-colors border-l border-gray-200"
     >

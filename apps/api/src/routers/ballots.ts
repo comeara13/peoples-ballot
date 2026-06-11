@@ -22,8 +22,8 @@ import { resolveBranding } from "../branding";
 
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
 
-async function fetchBallotById(id: string) {
-  const [ballot] = await db.select().from(ballots).where(eq(ballots.id, id));
+async function fetchBallotById(id: string, prefetched?: typeof ballots.$inferSelect) {
+  const ballot = prefetched ?? (await db.select().from(ballots).where(eq(ballots.id, id)).then(([r]) => r));
 
   if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -176,22 +176,23 @@ export const ballotsRouter = router({
       const k = Math.min(input.pairCount, weighted.length);
       const selected = weightedSample(weighted, k);
 
-      // 5. Persist ballot + pairs in a transaction
+      // 5. Pick a unique access code before entering the transaction.
+      // Retry loop uses a SELECT pre-check to avoid aborting the transaction on a 23505 collision.
+      // TOCTOU race is negligible given ~250k combinations and low ballot creation rate.
+      let accessCode: string | undefined;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = humanId({ separator: "-", capitalize: false });
+        const [existing] = await db.select({ id: ballots.id }).from(ballots).where(eq(ballots.accessCode, candidate)).limit(1);
+        if (!existing) { accessCode = candidate; break; }
+      }
+      if (!accessCode) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not generate unique access code" });
+
+      // 6. Persist ballot + pairs in a transaction
       return db.transaction(async (tx) => {
-        // Retry on the rare unique-constraint collision for access_code (Postgres error 23505).
-        let ballot: typeof ballots.$inferSelect | undefined;
-        for (let attempt = 0; attempt < 10; attempt++) {
-          try {
-            [ballot] = await tx
-              .insert(ballots)
-              .values({ partyId: input.partyId, status: "pending", accessCode: humanId({ separator: "-", capitalize: false }) })
-              .returning();
-            break;
-          } catch (err: unknown) {
-            const isUnique = err instanceof Error && (err as { code?: string }).code === "23505";
-            if (!isUnique || attempt === 9) throw err;
-          }
-        }
+        const [ballot] = await tx
+          .insert(ballots)
+          .values({ partyId: input.partyId, status: "pending", accessCode })
+          .returning();
         if (!ballot) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
         for (let i = 0; i < selected.length; i++) {
@@ -261,9 +262,9 @@ export const ballotsRouter = router({
   getByCode: publicProcedure
     .input(z.object({ code: z.string().min(1) }))
     .query(async ({ input }) => {
-      const [ballot] = await db.select().from(ballots).where(eq(ballots.accessCode, input.code));
+      const [ballot] = await db.select().from(ballots).where(eq(ballots.accessCode, input.code.toLowerCase()));
       if (!ballot) throw new TRPCError({ code: "NOT_FOUND" });
-      return fetchBallotById(ballot.id);
+      return fetchBallotById(ballot.id, ballot);
     }),
 
   submit: publicProcedure
