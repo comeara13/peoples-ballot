@@ -21,6 +21,7 @@ export const ideaBanks = pgTable("idea_banks", {
   subtitle: text("subtitle"),
   headerImageUrl: text("header_image_url"),
   postVoteMessage: text("post_vote_message"), // null → defaults to "Thank you for voting!"
+  questionHeading: text("question_heading"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -85,6 +86,7 @@ export const parties = pgTable(
     title: text("title"),
     subtitle: text("subtitle"),
     headerImageUrl: text("header_image_url"),
+    questionHeading: text("question_heading"),
     status: text("status", { enum: ["active", "closed"] })
       .default("active")
       .notNull(),

@@ -6,6 +6,7 @@ const bank = (overrides: Partial<Parameters<typeof resolveBranding>[0]> = {}) =>
   title: null,
   subtitle: null,
   headerImageUrl: null,
+  questionHeading: null,
   ...overrides,
 });
 
@@ -13,6 +14,7 @@ const party = (overrides: Partial<Parameters<typeof resolveBranding>[1]> = {}) =
   title: null,
   subtitle: null,
   headerImageUrl: null,
+  questionHeading: null,
   ...overrides,
 });
 
@@ -22,6 +24,7 @@ describe("resolveBranding", () => {
       title: "Default Bank",
       subtitle: null,
       headerImageUrl: null,
+      questionHeading: null,
     });
   });
 
@@ -31,6 +34,7 @@ describe("resolveBranding", () => {
       title: "Bank Title",
       subtitle: "Bank Sub",
       headerImageUrl: "https://img.example.com/a.jpg",
+      questionHeading: null,
     });
   });
 
@@ -41,6 +45,7 @@ describe("resolveBranding", () => {
       title: "Party Title",
       subtitle: "Party Sub",
       headerImageUrl: "https://img.example.com/b.jpg",
+      questionHeading: null,
     });
   });
 
@@ -51,6 +56,7 @@ describe("resolveBranding", () => {
       title: "Party Title",
       subtitle: "Bank Sub",
       headerImageUrl: "https://img.example.com/a.jpg",
+      questionHeading: null,
     });
   });
 
@@ -60,6 +66,7 @@ describe("resolveBranding", () => {
       title: "Default Bank",
       subtitle: "Party Sub",
       headerImageUrl: null,
+      questionHeading: null,
     });
   });
 
@@ -69,6 +76,7 @@ describe("resolveBranding", () => {
       title: "Default Bank",
       subtitle: "Bank Sub",
       headerImageUrl: null,
+      questionHeading: null,
     });
   });
 
@@ -77,6 +85,7 @@ describe("resolveBranding", () => {
       title: "Default Bank",
       subtitle: null,
       headerImageUrl: null,
+      questionHeading: null,
     });
   });
 
@@ -85,6 +94,7 @@ describe("resolveBranding", () => {
       title: "Default Bank",
       subtitle: null,
       headerImageUrl: null,
+      questionHeading: null,
     });
   });
 
@@ -94,6 +104,53 @@ describe("resolveBranding", () => {
       title: "Bank Title",
       subtitle: null,
       headerImageUrl: null,
+      questionHeading: null,
     });
+  });
+
+  it("uses bank questionHeading when party has none", () => {
+    const b = bank({ questionHeading: "Which idea is best?" });
+    expect(resolveBranding(b, null)).toEqual({
+      title: "Default Bank",
+      subtitle: null,
+      headerImageUrl: null,
+      questionHeading: "Which idea is best?",
+    });
+  });
+
+  it("party questionHeading overrides bank questionHeading", () => {
+    const b = bank({ questionHeading: "Bank question?" });
+    const p = party({ questionHeading: "Party question?" });
+    expect(resolveBranding(b, p)).toEqual({
+      title: "Default Bank",
+      subtitle: null,
+      headerImageUrl: null,
+      questionHeading: "Party question?",
+    });
+  });
+
+  it("party with null questionHeading falls back to bank questionHeading", () => {
+    const b = bank({ questionHeading: "Bank question?" });
+    expect(resolveBranding(b, party())).toEqual({
+      title: "Default Bank",
+      subtitle: null,
+      headerImageUrl: null,
+      questionHeading: "Bank question?",
+    });
+  });
+
+  it("whitespace-only questionHeading is treated as absent", () => {
+    const b = bank({ questionHeading: "   " });
+    expect(resolveBranding(b, null)).toEqual({
+      title: "Default Bank",
+      subtitle: null,
+      headerImageUrl: null,
+      questionHeading: null,
+    });
+  });
+
+  it("questionHeading supports markdown syntax as a plain string", () => {
+    const b = bank({ questionHeading: "Which idea would **best** help?" });
+    expect(resolveBranding(b, null).questionHeading).toBe("Which idea would **best** help?");
   });
 });

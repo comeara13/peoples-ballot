@@ -164,11 +164,13 @@ export const ballotsRouter = router({
         partyTitle: parties.title,
         partySubtitle: parties.subtitle,
         partyHeaderImageUrl: parties.headerImageUrl,
+        partyQuestionHeading: parties.questionHeading,
         bankName: ideaBanks.name,
         bankTitle: ideaBanks.title,
         bankSubtitle: ideaBanks.subtitle,
         bankHeaderImageUrl: ideaBanks.headerImageUrl,
         bankPostVoteMessage: ideaBanks.postVoteMessage,
+        bankQuestionHeading: ideaBanks.questionHeading,
       })
       .from(parties)
       .innerJoin(ideaBanks, eq(ideaBanks.id, parties.ideaBankId))
@@ -176,10 +178,10 @@ export const ballotsRouter = router({
 
     const branding = joined
       ? resolveBranding(
-          { name: joined.bankName, title: joined.bankTitle, subtitle: joined.bankSubtitle, headerImageUrl: joined.bankHeaderImageUrl },
-          { title: joined.partyTitle, subtitle: joined.partySubtitle, headerImageUrl: joined.partyHeaderImageUrl },
+          { name: joined.bankName, title: joined.bankTitle, subtitle: joined.bankSubtitle, headerImageUrl: joined.bankHeaderImageUrl, questionHeading: joined.bankQuestionHeading },
+          { title: joined.partyTitle, subtitle: joined.partySubtitle, headerImageUrl: joined.partyHeaderImageUrl, questionHeading: joined.partyQuestionHeading },
         )
-      : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null };
+      : { title: "", subtitle: null as string | null, headerImageUrl: null as string | null, questionHeading: null as string | null };
 
     const postVoteMessage = joined?.bankPostVoteMessage ?? null;
 

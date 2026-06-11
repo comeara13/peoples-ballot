@@ -115,11 +115,44 @@ function BrandingField({
 
 // ─── Bank Branding Section ────────────────────────────────────────────────────
 
-function BankBrandingSection({ bank }: { bank: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null } }) {
+function MarkdownField({
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-0.5">{label}</label>
+      {hint && <p className="text-xs text-gray-500 mb-1">{hint}</p>}
+      <textarea
+        id={id}
+        rows={rows}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white font-mono placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+      />
+    </div>
+  );
+}
+
+function BankBrandingSection({ bank }: { bank: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null; questionHeading: string | null } }) {
   const utils = trpc.useUtils();
   const [title, setTitle] = useState(bank.title ?? "");
   const [subtitle, setSubtitle] = useState(bank.subtitle ?? "");
   const [headerImageUrl, setHeaderImageUrl] = useState(bank.headerImageUrl ?? "");
+  const [questionHeading, setQuestionHeading] = useState(bank.questionHeading ?? "");
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,6 +162,7 @@ function BankBrandingSection({ bank }: { bank: { id: string; title: string | nul
       setTitle(data.title ?? "");
       setSubtitle(data.subtitle ?? "");
       setHeaderImageUrl(data.headerImageUrl ?? "");
+      setQuestionHeading(data.questionHeading ?? "");
       if (savedTimer.current) clearTimeout(savedTimer.current);
       setShowSaved(true);
       savedTimer.current = setTimeout(() => setShowSaved(false), 2500);
@@ -138,7 +172,8 @@ function BankBrandingSection({ bank }: { bank: { id: string; title: string | nul
   const dirty =
     title !== (bank.title ?? "") ||
     subtitle !== (bank.subtitle ?? "") ||
-    headerImageUrl !== (bank.headerImageUrl ?? "");
+    headerImageUrl !== (bank.headerImageUrl ?? "") ||
+    questionHeading !== (bank.questionHeading ?? "");
 
   function save() {
     update.mutate({
@@ -146,6 +181,7 @@ function BankBrandingSection({ bank }: { bank: { id: string; title: string | nul
       title: title.trim() || null,
       subtitle: subtitle.trim() || null,
       headerImageUrl: headerImageUrl.trim() || null,
+      questionHeading: questionHeading.trim() || null,
     });
   }
 
@@ -161,17 +197,25 @@ function BankBrandingSection({ bank }: { bank: { id: string; title: string | nul
           onChange={setTitle}
           placeholder="Displayed on the landing page (defaults to bank name)"
         />
-        <BrandingField
+        <MarkdownField
           label="Subtitle"
+          hint="Supports Markdown"
           value={subtitle}
           onChange={setSubtitle}
-          placeholder="Optional tagline or description"
+          placeholder="Optional tagline or description shown below the title"
         />
         <BrandingField
           label="Header Image URL"
           value={headerImageUrl}
           onChange={setHeaderImageUrl}
           placeholder="https://…"
+        />
+        <MarkdownField
+          label="Ballot Question Heading"
+          hint="Shown above the pairs on the ballot. Leave blank to hide. Supports Markdown."
+          value={questionHeading}
+          onChange={setQuestionHeading}
+          placeholder="Which idea would best help…"
         />
         <div className="flex items-center gap-3 pt-1">
           <button

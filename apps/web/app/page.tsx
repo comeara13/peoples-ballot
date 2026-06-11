@@ -8,6 +8,8 @@ import { PairCard } from "@/components/PairCard";
 import { VoterRegistrationForm } from "@/components/VoterRegistrationForm";
 import { SuggestIdeaSheet } from "@/components/SuggestIdeaSheet";
 
+import Markdown from "react-markdown";
+
 import type { Selection, BallotState } from "@/types/ballot";
 
 // ─── Campaign branding header (non-sticky, used on ballot view) ───────────────
@@ -33,7 +35,15 @@ function BallotHeader({
           <h1 className="text-2xl font-bold text-gray-900">{branding.title}</h1>
         )}
         {branding.subtitle && (
-          <p className="mt-1 text-gray-600">{branding.subtitle}</p>
+          <div className="mt-1 text-gray-600 prose prose-sm max-w-none">
+            <Markdown
+              components={{
+                a: ({ ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
+              }}
+            >
+              {branding.subtitle}
+            </Markdown>
+          </div>
         )}
       </div>
     </div>
@@ -608,19 +618,23 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     <div className="min-h-screen bg-gray-50 pb-24">
       <BallotHeader branding={ballot.branding} />
 
-      <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
-          <h2 className="text-base font-semibold text-gray-900 leading-snug">
-            Which idea would best help build a community that works for all of us?
-          </h2>
-          <button
-            onClick={() => router.push("/")}
-            className="text-xs text-gray-500 hover:text-gray-700 shrink-0"
-          >
-            ← Change ballot
-          </button>
+      {ballot.branding.questionHeading && (
+        <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
+            <h2 className="text-base font-semibold text-gray-900 leading-snug">
+              <Markdown components={{ p: ({ children }) => <span>{children}</span> }}>
+                {ballot.branding.questionHeading}
+              </Markdown>
+            </h2>
+            <button
+              onClick={() => router.push("/")}
+              className="text-xs text-gray-500 hover:text-gray-700 shrink-0"
+            >
+              ← Change ballot
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
         <WindowBanner party={ballot.party} />
