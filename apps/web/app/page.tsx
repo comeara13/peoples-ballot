@@ -622,7 +622,16 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
         <div className="bg-white border-b border-gray-200 px-4 py-5 sticky top-0 z-10 shadow-sm">
           <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-gray-900 leading-snug">
-              <Markdown components={{ p: ({ children }) => <span>{children}</span> }}>
+              {/* allowedElements + unwrapDisallowed keeps only inline nodes,
+                  preventing block elements (lists, headings, pre) from being
+                  nested inside <h2> and producing invalid HTML. */}
+              <Markdown
+                allowedElements={["strong", "em", "a", "code", "del"]}
+                unwrapDisallowed
+                components={{
+                  a: ({ ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
+                }}
+              >
                 {ballot.branding.questionHeading}
               </Markdown>
             </h2>
