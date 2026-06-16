@@ -550,7 +550,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   if (submitMutation.isSuccess && !postSurveyDone) {
     return (
       <PostVoteSurvey
-        ballotId={ballotId}
+        ballotId={ballot.id}
         postVoteMessage={ballot.postVoteMessage ?? "Thank you for voting!"}
         onComplete={() => setPostSurveyDone(true)}
       />
@@ -693,7 +693,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
       </div>
 
       <SuggestIdeaSheet
-        ballotId={ballotId}
+        ballotId={ballot.id}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
       />
