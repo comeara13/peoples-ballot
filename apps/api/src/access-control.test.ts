@@ -46,11 +46,12 @@ async function expectNotForbidden(p: Promise<unknown>) {
 // ── ballots ──────────────────────────────────────────────────────────────────
 
 describe("ballots", () => {
-  it("generate    → admin",  () => expectForbidden(anon.ballots.generate({ partyId: NIL })));
-  it("listByParty → admin",  () => expectForbidden(anon.ballots.listByParty({ partyId: NIL })));
-  it("getById     → public", () => expectNotForbidden(anon.ballots.getById({ id: NIL })));
-  it("getByCode   → public", () => expectNotForbidden(anon.ballots.getByCode({ code: "brave-golden-river" })));
-  it("submit      → public", () => expectNotForbidden(anon.ballots.submit({ ballotId: NIL, votes: [] })));
+  it("generate          → admin",  () => expectForbidden(anon.ballots.generate({ partyId: NIL })));
+  it("listByParty       → admin",  () => expectForbidden(anon.ballots.listByParty({ partyId: NIL })));
+  it("getById           → public", () => expectNotForbidden(anon.ballots.getById({ id: NIL })));
+  it("getByCode         → public", () => expectNotForbidden(anon.ballots.getByCode({ code: "brave-golden-river" })));
+  it("submit            → public", () => expectNotForbidden(anon.ballots.submit({ ballotId: NIL, votes: [] })));
+  it("createForAlwaysOn → public", () => expectNotForbidden(anon.ballots.createForAlwaysOn({ partyId: NIL })));
 });
 
 // ── votes ────────────────────────────────────────────────────────────────────
