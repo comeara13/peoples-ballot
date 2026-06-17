@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 interface ShareStorySheetProps {
@@ -12,6 +12,7 @@ interface ShareStorySheetProps {
 export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProps) {
   const [phase, setPhase] = useState<"form" | "success">("form");
   const [text, setText] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const submit = trpc.testimonials.submit.useMutation({
     onSuccess: () => setPhase("success"),
@@ -35,15 +36,38 @@ export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProp
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'button, textarea, input, [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         resetForm();
         onClose();
+        return;
       }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm is stable; React Compiler handles memoization
+      if (e.key !== "Tab" || focusable.length === 0) return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm/onClose are stable across renders
   }, [open, onClose]);
 
   if (!open) return null;
@@ -58,6 +82,7 @@ export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProp
 
       <div
         role="dialog"
+        ref={dialogRef}
         aria-modal="true"
         aria-label="Share your story"
         className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[90vh] overflow-y-auto"
@@ -90,7 +115,7 @@ export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProp
                 <p className="text-xs text-gray-500 mt-1 text-right">{text.length} / 5000</p>
               </div>
 
-              {submit.error && <p className="text-xs text-red-600">{submit.error.message}</p>}
+              {submit.error && <p role="alert" className="text-xs text-red-600">{submit.error.message}</p>}
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <button

@@ -13,7 +13,6 @@ export const suggestedIdeasRouter = router({
         ballotId: z.string().uuid(),
         text: z.string().min(1).max(2000),
         tagIds: z.array(z.string().uuid()).default([]),
-        testimonial: z.string().max(5000).optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -48,7 +47,6 @@ export const suggestedIdeasRouter = router({
           ideaBankId: party.ideaBankId,
           voterId: ballot.voterId ?? null,
           text: input.text,
-          testimonial: input.testimonial ?? null,
         })
         .returning();
 
@@ -75,7 +73,6 @@ export const suggestedIdeasRouter = router({
         .select({
           id: suggestedIdeas.id,
           text: suggestedIdeas.text,
-          testimonial: suggestedIdeas.testimonial,
           status: suggestedIdeas.status,
           createdAt: suggestedIdeas.createdAt,
           voterFirstName: voters.firstName,
@@ -96,7 +93,6 @@ export const suggestedIdeasRouter = router({
         .select({
           id: suggestedIdeas.id,
           text: suggestedIdeas.text,
-          testimonial: suggestedIdeas.testimonial,
           status: suggestedIdeas.status,
           createdAt: suggestedIdeas.createdAt,
           partyName: parties.name,

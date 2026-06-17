@@ -1196,7 +1196,6 @@ type SuggestionRow = {
   id: string;
   text: string;
   tags: Tag[];
-  testimonial: string | null;
   status: string;
   linkedIdeaCount: number;
   createdAt: Date | string;
@@ -1275,12 +1274,6 @@ function SuggestionCard({ suggestion }: { suggestion: SuggestionRow }) {
       </div>
 
       <p className="text-sm text-gray-800 leading-snug">{suggestion.text}</p>
-
-      {suggestion.testimonial && (
-        <p className="text-xs text-gray-600 italic leading-relaxed border-l-2 border-gray-200 pl-3">
-          {suggestion.testimonial}
-        </p>
-      )}
 
       {(suggestion.voterFirstName || suggestion.voterLastName) && (
         <p className="text-xs text-gray-500">

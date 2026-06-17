@@ -2,6 +2,7 @@ import { db } from "./index";
 import {
   affiliations,
   assessmentQuestions,
+  ballots,
   glossaryTerms,
   ideaBanks,
   ideaGlossaryTerms,
@@ -9,6 +10,7 @@ import {
   ideaTranslations,
   parties,
   tags,
+  testimonials,
 } from "./schema";
 import { eq, inArray, isNull, and } from "drizzle-orm";
 
@@ -279,6 +281,32 @@ async function seed() {
     await db.insert(ideaGlossaryTerms).values(ideaLinks).onConflictDoNothing();
   }
   console.log(`Linked ${ideaLinks.length} idea↔glossary-term associations`);
+
+  const seedBallots = await db
+    .insert(ballots)
+    .values([
+      { ideaBankId: bank.id, partyId: party.id, status: "submitted" },
+      { ideaBankId: bank.id, partyId: party.id, status: "submitted" },
+      { ideaBankId: bank.id, partyId: party.id, status: "submitted" },
+    ])
+    .returning();
+  console.log(`Created ${seedBallots.length} seed ballots`);
+
+  await db.insert(testimonials).values([
+    {
+      ballotId: seedBallots[0].id,
+      text: "I've seen firsthand how under-resourced our neighborhood schools are. My kids deserve the same opportunities as kids in wealthier neighborhoods.",
+    },
+    {
+      ballotId: seedBallots[1].id,
+      text: "Mental health support saved my life. We need to stop treating this as a luxury and start treating it as the public health issue it is.",
+    },
+    {
+      ballotId: seedBallots[2].id,
+      text: "My brother came home from prison two years ago and couldn't find a single employer willing to give him a chance. We're setting people up to fail.",
+    },
+  ]);
+  console.log("Inserted 3 seed testimonials");
 
   console.log("Done.");
   process.exit(0);

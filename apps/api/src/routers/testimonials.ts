@@ -45,11 +45,9 @@ export const testimonialsRouter = router({
           createdAt: testimonials.createdAt,
           ballotId: testimonials.ballotId,
           suggestionId: testimonials.suggestionId,
-          partyName: parties.name,
         })
         .from(testimonials)
-        .innerJoin(ballots, eq(ballots.id, testimonials.ballotId))
-        .innerJoin(parties, eq(parties.id, ballots.partyId))
+        .leftJoin(ballots, eq(ballots.id, testimonials.ballotId))
         .where(eq(ballots.partyId, input.partyId))
         .orderBy(desc(testimonials.createdAt));
     }),
@@ -67,8 +65,8 @@ export const testimonialsRouter = router({
           partyName: parties.name,
         })
         .from(testimonials)
-        .innerJoin(ballots, eq(ballots.id, testimonials.ballotId))
-        .innerJoin(parties, eq(parties.id, ballots.partyId))
+        .leftJoin(ballots, eq(ballots.id, testimonials.ballotId))
+        .leftJoin(parties, eq(parties.id, ballots.partyId))
         .where(eq(parties.ideaBankId, input.ideaBankId))
         .orderBy(desc(testimonials.createdAt));
     }),

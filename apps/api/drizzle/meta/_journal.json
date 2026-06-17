@@ -155,6 +155,13 @@
       "when": 1781667259074,
       "tag": "0021_tan_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1781670404995,
+      "tag": "0022_loose_mad_thinker",
+      "breakpoints": true
     }
   ]
 }
