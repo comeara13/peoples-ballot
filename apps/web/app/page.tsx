@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useId, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc";
@@ -724,14 +724,58 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   );
 }
 
+// ─── Always-on party entry (ballot created on demand) ─────────────────────────
+
+function AlwaysOnEntry({ partyId }: { partyId: string }) {
+  const [ballotId, setBallotId] = useState<string | null>(null);
+  const fired = useRef(false);
+  const createMutation = trpc.ballots.createForAlwaysOn.useMutation({
+    onSuccess: (ballot) => setBallotId(ballot.id),
+  });
+
+  // Fire once on mount. The `key={partyId}` on the call site remounts this component
+  // when partyId changes, so the ref + empty dep array is correct — no stale closure.
+  useEffect(() => {
+    if (fired.current) return;
+    fired.current = true;
+    createMutation.mutate({ partyId });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (ballotId) return <LiveBallot ballotId={ballotId} />;
+
+  if (createMutation.isError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-sm text-red-600 mb-4">{createMutation.error?.message ?? "Unable to create ballot."}</p>
+          <button
+            onClick={() => createMutation.mutate({ partyId })}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <p className="text-sm text-gray-600">Setting up your ballot…</p>
+    </div>
+  );
+}
+
 // ─── Page router ──────────────────────────────────────────────────────────────
 
 function BallotPageContent() {
   const searchParams = useSearchParams();
+  const partyId = searchParams.get("party");
   const ballotId = searchParams.get("ballotId");
 
-  if (!ballotId) return <HomeContent />;
-  return <LiveBallot ballotId={ballotId} />;
+  if (partyId) return <AlwaysOnEntry key={partyId} partyId={partyId} />;
+  if (ballotId) return <LiveBallot ballotId={ballotId} />;
+  return <HomeContent />;
 }
 
 export default function Home() {

@@ -87,6 +87,8 @@ export const parties = pgTable(
     subtitle: text("subtitle"),
     headerImageUrl: text("header_image_url"),
     questionHeading: text("question_heading"),
+    mode: text("mode", { enum: ["standard", "always_on"] }).default("standard").notNull(),
+    defaultPairCount: integer("default_pair_count"),
     status: text("status", { enum: ["active", "closed"] })
       .default("active")
       .notNull(),

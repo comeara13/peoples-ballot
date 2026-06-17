@@ -118,6 +118,88 @@ async function fetchBallotById(id: string, prefetched?: typeof ballots.$inferSel
   };
 }
 
+const ALWAYS_ON_DEFAULT_PAIR_COUNT = 10;
+
+// Shared ballot generation logic used by both admin `generate` and public `createForAlwaysOn`.
+// Callers are responsible for fetching the party and passing ideaBankId to avoid a redundant query.
+async function generateBallotForParty(partyId: string, ideaBankId: string, pairCount: number) {
+  const activeIdeas = await db
+    .select({ id: ideas.id })
+    .from(ideas)
+    .where(and(eq(ideas.ideaBankId, ideaBankId), eq(ideas.isActive, true)));
+
+  if (activeIdeas.length < 2) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Need at least 2 active ideas to generate a ballot." });
+  }
+
+  const existingPrompts = await db
+    .select({ id: prompts.id, leftIdeaId: prompts.leftIdeaId, rightIdeaId: prompts.rightIdeaId, votesCount: prompts.votesCount })
+    .from(prompts)
+    .where(eq(prompts.ideaBankId, ideaBankId));
+
+  const promptById = new Map(existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p]));
+  const votesByKey = new Map([...promptById.entries()].map(([k, p]) => [k, p.votesCount]));
+
+  const ideaIds = activeIdeas.map((i) => i.id);
+  const weighted = buildPairWeights(ideaIds, votesByKey);
+  const k = Math.min(pairCount, weighted.length);
+  const selected = weightedSample(weighted, k);
+
+  // Pick a unique access code before entering the transaction.
+  // Retry loop uses a SELECT pre-check to avoid aborting the transaction on a 23505 collision
+  // (a failed INSERT inside a Postgres tx leaves it in an aborted state; 25P02 on every
+  // subsequent statement until rollback). TOCTOU window exists: two concurrent generates
+  // could pass the SELECT check and race to INSERT the same code. If that happens the second
+  // INSERT will throw 23505 inside the transaction and surface as a 500 — acceptable given
+  // human-id@4's vocabulary produces billions of combinations and ballot creation rate is low.
+  let accessCode: string | undefined;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = humanId({ separator: "-", capitalize: false });
+    const [existing] = await db.select({ id: ballots.id }).from(ballots).where(eq(ballots.accessCode, candidate)).limit(1);
+    if (!existing) { accessCode = candidate; break; }
+  }
+  if (!accessCode) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not generate unique access code" });
+
+  return db.transaction(async (tx) => {
+    const [ballot] = await tx
+      .insert(ballots)
+      .values({ partyId, status: "pending", accessCode })
+      .returning();
+    if (!ballot) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    for (let i = 0; i < selected.length; i++) {
+      const pair = selected[i];
+      const existing = promptById.get(`${pair.left}|${pair.right}`);
+
+      let promptId: string;
+      if (existing) {
+        promptId = existing.id;
+      } else {
+        const [p] = await tx
+          .insert(prompts)
+          .values({ ideaBankId, leftIdeaId: pair.left, rightIdeaId: pair.right })
+          .onConflictDoUpdate({
+            target: [prompts.ideaBankId, prompts.leftIdeaId, prompts.rightIdeaId],
+            set: { votesCount: prompts.votesCount }, // no-op to get the row back
+          })
+          .returning();
+        promptId = p.id;
+      }
+
+      const flip = Math.random() < 0.5;
+      await tx.insert(ballotPairs).values({
+        ballotId: ballot.id,
+        promptId,
+        position: i + 1,
+        leftIdeaId: flip ? pair.right : pair.left,
+        rightIdeaId: flip ? pair.left : pair.right,
+      });
+    }
+
+    return ballot;
+  });
+}
+
 export const ballotsRouter = router({
   generate: adminProcedure
     .input(
@@ -127,115 +209,22 @@ export const ballotsRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      // 1. Look up party → derive ideaBankId
       const [party] = await db.select().from(parties).where(eq(parties.id, input.partyId));
-
       if (!party) throw new TRPCError({ code: "NOT_FOUND" });
       if (party.status === "closed")
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot generate ballots for a closed party.",
-        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot generate ballots for a closed party." });
+      return generateBallotForParty(input.partyId, party.ideaBankId, input.pairCount);
+    }),
 
-      const ideaBankId = party.ideaBankId;
-
-      // 2. Active ideas
-      const activeIdeas = await db
-        .select({ id: ideas.id })
-        .from(ideas)
-        .where(and(eq(ideas.ideaBankId, ideaBankId), eq(ideas.isActive, true)));
-
-      if (activeIdeas.length < 2) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Need at least 2 active ideas to generate a ballot.",
-        });
-      }
-
-      // 3. Existing prompt vote history for catchup weights (bank-wide)
-      const existingPrompts = await db
-        .select({
-          id: prompts.id,
-          leftIdeaId: prompts.leftIdeaId,
-          rightIdeaId: prompts.rightIdeaId,
-          votesCount: prompts.votesCount,
-        })
-        .from(prompts)
-        .where(eq(prompts.ideaBankId, ideaBankId));
-
-      const promptById = new Map(
-        existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p]),
-      );
-      const votesByKey = new Map(
-        existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p.votesCount]),
-      );
-
-      // 4. Catchup sampling
-      const ideaIds = activeIdeas.map((i) => i.id);
-      const weighted = buildPairWeights(ideaIds, votesByKey);
-      const k = Math.min(input.pairCount, weighted.length);
-      const selected = weightedSample(weighted, k);
-
-      // 5. Pick a unique access code before entering the transaction.
-      // Retry loop uses a SELECT pre-check to avoid aborting the transaction on a 23505 collision
-      // (a failed INSERT inside a Postgres tx leaves it in an aborted state; 25P02 on every
-      // subsequent statement until rollback). TOCTOU window exists: two concurrent generates
-      // could pass the SELECT check and race to INSERT the same code. If that happens the second
-      // INSERT will throw 23505 inside the transaction and surface as a 500 — acceptable given
-      // human-id@4's vocabulary produces billions of combinations and ballot creation rate is low.
-      let accessCode: string | undefined;
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const candidate = humanId({ separator: "-", capitalize: false });
-        const [existing] = await db.select({ id: ballots.id }).from(ballots).where(eq(ballots.accessCode, candidate)).limit(1);
-        if (!existing) { accessCode = candidate; break; }
-      }
-      if (!accessCode) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not generate unique access code" });
-
-      // 6. Persist ballot + pairs in a transaction
-      return db.transaction(async (tx) => {
-        const [ballot] = await tx
-          .insert(ballots)
-          .values({ partyId: input.partyId, status: "pending", accessCode })
-          .returning();
-        if (!ballot) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-        for (let i = 0; i < selected.length; i++) {
-          const pair = selected[i];
-          const existing = promptById.get(`${pair.left}|${pair.right}`);
-
-          // Upsert prompt — atomic get-or-create
-          let promptId: string;
-          if (existing) {
-            promptId = existing.id;
-          } else {
-            const [p] = await tx
-              .insert(prompts)
-              .values({
-                ideaBankId,
-                leftIdeaId: pair.left,
-                rightIdeaId: pair.right,
-              })
-              .onConflictDoUpdate({
-                target: [prompts.ideaBankId, prompts.leftIdeaId, prompts.rightIdeaId],
-                set: { votesCount: prompts.votesCount }, // no-op to get the row back
-              })
-              .returning();
-            promptId = p.id;
-          }
-
-          // Random left/right flip for presentation variety
-          const flip = Math.random() < 0.5;
-          await tx.insert(ballotPairs).values({
-            ballotId: ballot.id,
-            promptId,
-            position: i + 1,
-            leftIdeaId: flip ? pair.right : pair.left,
-            rightIdeaId: flip ? pair.left : pair.right,
-          });
-        }
-
-        return ballot;
-      });
+  createForAlwaysOn: publicProcedure
+    .input(z.object({ partyId: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      const [party] = await db.select().from(parties).where(eq(parties.id, input.partyId));
+      // Return NOT_FOUND for both missing parties and standard-mode parties to avoid UUID enumeration.
+      if (!party || party.mode !== "always_on") throw new TRPCError({ code: "NOT_FOUND" });
+      if (party.status === "closed")
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This voting session is closed." });
+      return generateBallotForParty(input.partyId, party.ideaBankId, party.defaultPairCount ?? ALWAYS_ON_DEFAULT_PAIR_COUNT);
     }),
 
   listByParty: adminProcedure

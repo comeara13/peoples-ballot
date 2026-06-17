@@ -1090,6 +1090,8 @@ function CreatePartyForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
+  const [mode, setMode] = useState<"standard" | "always_on">("standard");
+  const [defaultPairCount, setDefaultPairCount] = useState(10);
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const create = trpc.parties.create.useMutation({ onSuccess: onCreated });
@@ -1099,6 +1101,8 @@ function CreatePartyForm({
     create.mutate({
       ideaBankId: bankId,
       name: name.trim(),
+      mode,
+      defaultPairCount: mode === "always_on" ? defaultPairCount : undefined,
       startAt: startAt ? new Date(startAt).toISOString() : undefined,
       endAt: endAt ? new Date(endAt).toISOString() : undefined,
     });
@@ -1116,6 +1120,35 @@ function CreatePartyForm({
           autoFocus
           className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-800 bg-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
         />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("standard")}
+            className={`flex-1 py-1.5 text-xs rounded border font-medium transition-colors ${mode === "standard" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
+          >
+            Standard
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("always_on")}
+            className={`flex-1 py-1.5 text-xs rounded border font-medium transition-colors ${mode === "always_on" ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}`}
+          >
+            Always On
+          </button>
+        </div>
+        {mode === "always_on" && (
+          <div>
+            <label className="block text-xs text-gray-600 mb-0.5">Pairs per ballot</label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={defaultPairCount}
+              onChange={(e) => setDefaultPairCount(Math.max(1, Math.min(50, Number(e.target.value))))}
+              className="w-20 border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-800 bg-white focus:outline-none focus:border-blue-500 text-center"
+            />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-xs text-gray-600 mb-0.5">Opens (optional)</label>
@@ -1767,6 +1800,11 @@ function PartySection({ bankId }: { bankId: string }) {
                 <span className="font-medium text-gray-900 group-hover:text-blue-700 flex-1">
                   {party.name}
                 </span>
+                {party.mode === "always_on" && (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 shrink-0">
+                    Always On
+                  </span>
+                )}
                 <span
                   className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${PARTY_STATUS_STYLES[party.status] ?? ""}`}
                 >
@@ -1963,8 +2001,13 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
 
       <div className="flex items-start justify-between mb-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-semibold text-gray-900">{party?.name ?? "Party"}</h1>
+            {party?.mode === "always_on" && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                Always On
+              </span>
+            )}
             {party && (
               <span
                 className={`text-xs font-medium px-2 py-0.5 rounded-full ${PARTY_STATUS_STYLES[party.status] ?? ""}`}
@@ -2042,6 +2085,30 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
         </div>
       )}
 
+      {/* Shareable URL (always-on parties only) */}
+      {party?.mode === "always_on" && (
+        <div className="border border-purple-200 rounded-lg p-4 bg-purple-50 mb-6">
+          <h2 className="text-xs font-semibold text-purple-800 uppercase tracking-wide mb-2">
+            Shareable URL
+          </h2>
+          <p className="text-xs text-purple-700 mb-2">
+            Anyone who visits this link gets a ballot created for them automatically.
+            {party.defaultPairCount && ` Each ballot contains ${party.defaultPairCount} pairs.`}
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs bg-white border border-purple-200 rounded px-2 py-1.5 text-purple-900 overflow-x-auto whitespace-nowrap">
+              {`${window.location.origin}/?party=${partyId}`}
+            </code>
+            <button
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?party=${partyId}`)}
+              className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 font-medium shrink-0"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Party branding override */}
       {party && (
         <PartyBrandingSection key={party.id} party={party} bankId={bankId} isClosed={isClosed} />
@@ -2049,7 +2116,7 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-900">Ballots</h2>
-        {!isClosed && (
+        {!isClosed && party?.mode !== "always_on" && (
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -2068,6 +2135,9 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
               {generate.isPending ? "Generating…" : "Generate Ballot"}
             </button>
           </div>
+        )}
+        {party?.mode === "always_on" && (
+          <p className="text-xs text-gray-500">Ballots are created automatically when voters visit the link.</p>
         )}
       </div>
 
