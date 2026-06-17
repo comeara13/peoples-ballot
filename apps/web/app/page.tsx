@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { PairCard } from "@/components/PairCard";
 import { VoterRegistrationForm } from "@/components/VoterRegistrationForm";
 import { SuggestIdeaSheet } from "@/components/SuggestIdeaSheet";
+import { ShareStorySheet } from "@/components/ShareStorySheet";
 import { isBallotAccessCode } from "@/lib/ballot";
 
 import Markdown from "react-markdown";
@@ -509,6 +510,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
 
   const [state, setState] = useState<BallotState>({});
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [storySheetOpen, setStorySheetOpen] = useState(false);
   const [postSurveyDone, setPostSurveyDone] = useState(false);
   const submitMutation = trpc.ballots.submit.useMutation({
     onSuccess: invalidateBallot,
@@ -677,18 +679,6 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
           ))}
         </div>
 
-        {!windowClosed && (
-          <div className="border border-gray-200 rounded-lg p-4 bg-white text-center">
-            <p className="text-sm text-gray-600 mb-3">Have an idea of your own?</p>
-            <button
-              onClick={() => setSheetOpen(true)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-            >
-              Submit Your Own Idea →
-            </button>
-          </div>
-        )}
-
         <WindowFooter party={ballot.party} />
       </div>
 
@@ -696,6 +686,12 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
         ballotId={ballot.id}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
+      />
+
+      <ShareStorySheet
+        ballotId={ballot.id}
+        open={storySheetOpen}
+        onClose={() => setStorySheetOpen(false)}
       />
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-lg z-10">
@@ -708,13 +704,31 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
               <span className="ml-2 text-amber-600 text-xs">({total - answered} remaining)</span>
             )}
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={!allAnswered || submitMutation.isPending || windowClosed}
-            className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors"
-          >
-            {submitMutation.isPending ? "Submitting…" : "Submit Ballot"}
-          </button>
+          <div className="flex items-center gap-2">
+            {!windowClosed && (
+              <button
+                onClick={() => setStorySheetOpen(true)}
+                className="border border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                Share your story
+              </button>
+            )}
+            {!windowClosed && (
+              <button
+                onClick={() => setSheetOpen(true)}
+                className="border border-gray-300 text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                Submit Idea
+              </button>
+            )}
+            <button
+              onClick={handleSubmit}
+              disabled={!allAnswered || submitMutation.isPending || windowClosed}
+              className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors"
+            >
+              {submitMutation.isPending ? "Submitting…" : "Submit Ballot"}
+            </button>
+          </div>
         </div>
         {submitMutation.error && (
           <p className="text-xs text-red-600 text-center mt-1">{submitMutation.error.message}</p>

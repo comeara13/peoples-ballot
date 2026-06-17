@@ -1401,6 +1401,91 @@ function PartySuggestionsSection({ partyId }: { partyId: string }) {
   return <SuggestionsSection data={data} isLoading={isLoading} />;
 }
 
+// ─── Testimonials Section ─────────────────────────────────────────────────────
+
+function PartyTestimonialsSection({ partyId }: { partyId: string }) {
+  const { data, isLoading } = trpc.testimonials.listForParty.useQuery({ partyId });
+
+  return (
+    <div className="mt-8">
+      <h2 className="text-base font-semibold text-gray-900 mb-4">
+        Testimonials
+        {data && data.length > 0 && (
+          <span className="ml-2 text-sm font-normal text-gray-500">({data.length})</span>
+        )}
+      </h2>
+
+      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
+
+      {!isLoading && !data?.length && (
+        <p className="text-sm text-gray-600">No testimonials yet.</p>
+      )}
+
+      {data && data.length > 0 && (
+        <div className="space-y-3">
+          {data.map((t) => (
+            <div key={t.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{t.text}</p>
+              <p className="text-xs text-gray-500 mt-2">
+                {new Date(t.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BankTestimonialsSection({ ideaBankId }: { ideaBankId: string }) {
+  const { data, isLoading } = trpc.testimonials.listForBank.useQuery({ ideaBankId });
+
+  return (
+    <div className="mt-8">
+      <h2 className="text-base font-semibold text-gray-900 mb-4">
+        Testimonials
+        {data && data.length > 0 && (
+          <span className="ml-2 text-sm font-normal text-gray-500">({data.length})</span>
+        )}
+      </h2>
+
+      {isLoading && <p className="text-sm text-gray-600">Loading…</p>}
+
+      {!isLoading && !data?.length && (
+        <p className="text-sm text-gray-600">No testimonials yet.</p>
+      )}
+
+      {data && data.length > 0 && (
+        <div className="space-y-3">
+          {data.map((t) => (
+            <div key={t.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{t.text}</p>
+              <div className="flex items-center gap-2 mt-2">
+                {t.partyName && (
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {t.partyName}
+                  </span>
+                )}
+                <p className="text-xs text-gray-500">
+                  {new Date(t.createdAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Affiliation Groups Section ──────────────────────────────────────────────
 
 function AffiliationGroupsSection({ ideaBankId }: { ideaBankId: string }) {
@@ -2160,6 +2245,9 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
 
       <div className="my-8 border-t border-gray-200" />
       <PartySuggestionsSection partyId={partyId} />
+
+      <div className="my-8 border-t border-gray-200" />
+      <PartyTestimonialsSection partyId={partyId} />
     </div>
   );
 }
@@ -2265,6 +2353,9 @@ function BankDetail({ bankId }: { bankId: string }) {
 
       <div className="my-8 border-t border-gray-200" />
       <BankSuggestionsSection ideaBankId={bankId} />
+
+      <div className="my-8 border-t border-gray-200" />
+      <BankTestimonialsSection ideaBankId={bankId} />
     </div>
   );
 }

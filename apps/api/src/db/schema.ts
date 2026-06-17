@@ -253,6 +253,14 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const testimonials = pgTable("testimonials", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ballotId: uuid("ballot_id").references(() => ballots.id, { onDelete: "set null" }),
+  suggestionId: uuid("suggestion_id").references(() => suggestedIdeas.id, { onDelete: "set null" }),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Platform-wide controlled vocabulary of tags. Typed (issue_category | scale).
 // Tags are archived rather than deleted — archived tags remain on existing items
 // but are excluded from pickers for new tagging.
