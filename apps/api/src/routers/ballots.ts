@@ -118,12 +118,11 @@ async function fetchBallotById(id: string, prefetched?: typeof ballots.$inferSel
   };
 }
 
-// Shared ballot generation logic used by both admin `generate` and public `createForAlwaysOn`.
-async function generateBallotForParty(partyId: string, pairCount: number) {
-  const [partyRow] = await db.select({ ideaBankId: parties.ideaBankId }).from(parties).where(eq(parties.id, partyId));
-  if (!partyRow) throw new TRPCError({ code: "NOT_FOUND" });
-  const ideaBankId = partyRow.ideaBankId;
+const ALWAYS_ON_DEFAULT_PAIR_COUNT = 10;
 
+// Shared ballot generation logic used by both admin `generate` and public `createForAlwaysOn`.
+// Callers are responsible for fetching the party and passing ideaBankId to avoid a redundant query.
+async function generateBallotForParty(partyId: string, ideaBankId: string, pairCount: number) {
   const activeIdeas = await db
     .select({ id: ideas.id })
     .from(ideas)
@@ -139,7 +138,7 @@ async function generateBallotForParty(partyId: string, pairCount: number) {
     .where(eq(prompts.ideaBankId, ideaBankId));
 
   const promptById = new Map(existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p]));
-  const votesByKey = new Map(existingPrompts.map((p) => [`${p.leftIdeaId}|${p.rightIdeaId}`, p.votesCount]));
+  const votesByKey = new Map([...promptById.entries()].map(([k, p]) => [k, p.votesCount]));
 
   const ideaIds = activeIdeas.map((i) => i.id);
   const weighted = buildPairWeights(ideaIds, votesByKey);
@@ -214,19 +213,18 @@ export const ballotsRouter = router({
       if (!party) throw new TRPCError({ code: "NOT_FOUND" });
       if (party.status === "closed")
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot generate ballots for a closed party." });
-      return generateBallotForParty(input.partyId, input.pairCount);
+      return generateBallotForParty(input.partyId, party.ideaBankId, input.pairCount);
     }),
 
   createForAlwaysOn: publicProcedure
     .input(z.object({ partyId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const [party] = await db.select().from(parties).where(eq(parties.id, input.partyId));
-      if (!party) throw new TRPCError({ code: "NOT_FOUND" });
-      if (party.mode !== "always_on")
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Party is not open for walk-in voting." });
+      // Return NOT_FOUND for both missing parties and standard-mode parties to avoid UUID enumeration.
+      if (!party || party.mode !== "always_on") throw new TRPCError({ code: "NOT_FOUND" });
       if (party.status === "closed")
         throw new TRPCError({ code: "BAD_REQUEST", message: "This voting session is closed." });
-      return generateBallotForParty(input.partyId, party.defaultPairCount ?? 10);
+      return generateBallotForParty(input.partyId, party.ideaBankId, party.defaultPairCount ?? ALWAYS_ON_DEFAULT_PAIR_COUNT);
     }),
 
   listByParty: adminProcedure

@@ -47,6 +47,8 @@ export const partiesRouter = router({
         subtitle: z.string().min(1).max(500).nullable().optional(),
         headerImageUrl: z.string().url().startsWith("https://").nullable().optional(),
         questionHeading: z.string().min(1).max(500).nullable().optional(),
+        // mode is intentionally not updatable — changing standard↔always_on after creation
+        // would silently break existing ballot URLs and voter expectations.
         defaultPairCount: z.number().int().min(1).max(50).nullable().optional(),
         startAt: z.string().datetime().optional(),
         endAt: z.string().datetime().nullable().optional(),

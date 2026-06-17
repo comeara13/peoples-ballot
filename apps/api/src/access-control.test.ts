@@ -52,6 +52,14 @@ describe("ballots", () => {
   it("getByCode         → public", () => expectNotForbidden(anon.ballots.getByCode({ code: "brave-golden-river" })));
   it("submit            → public", () => expectNotForbidden(anon.ballots.submit({ ballotId: NIL, votes: [] })));
   it("createForAlwaysOn → public", () => expectNotForbidden(anon.ballots.createForAlwaysOn({ partyId: NIL })));
+  it("createForAlwaysOn with non-existent party → NOT_FOUND", async () => {
+    try {
+      await anon.ballots.createForAlwaysOn({ partyId: NIL });
+    } catch (e) {
+      expect(e instanceof TRPCError).toBe(true);
+      expect((e as TRPCError).code).toBe("NOT_FOUND");
+    }
+  });
 });
 
 // ── votes ────────────────────────────────────────────────────────────────────

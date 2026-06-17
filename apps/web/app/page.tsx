@@ -733,6 +733,8 @@ function AlwaysOnEntry({ partyId }: { partyId: string }) {
     onSuccess: (ballot) => setBallotId(ballot.id),
   });
 
+  // Fire once on mount. The `key={partyId}` on the call site remounts this component
+  // when partyId changes, so the ref + empty dep array is correct — no stale closure.
   useEffect(() => {
     if (fired.current) return;
     fired.current = true;
@@ -746,6 +748,12 @@ function AlwaysOnEntry({ partyId }: { partyId: string }) {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="text-center">
           <p className="text-sm text-red-600 mb-4">{createMutation.error?.message ?? "Unable to create ballot."}</p>
+          <button
+            onClick={() => createMutation.mutate({ partyId })}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -765,7 +773,7 @@ function BallotPageContent() {
   const partyId = searchParams.get("party");
   const ballotId = searchParams.get("ballotId");
 
-  if (partyId) return <AlwaysOnEntry partyId={partyId} />;
+  if (partyId) return <AlwaysOnEntry key={partyId} partyId={partyId} />;
   if (ballotId) return <LiveBallot ballotId={ballotId} />;
   return <HomeContent />;
 }

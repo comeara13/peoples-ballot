@@ -2097,14 +2097,10 @@ function PartyDetail({ bankId, partyId }: { bankId: string; partyId: string }) {
           </p>
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs bg-white border border-purple-200 rounded px-2 py-1.5 text-purple-900 overflow-x-auto whitespace-nowrap">
-              {typeof window !== "undefined" ? `${window.location.origin}/?party=${partyId}` : `<origin>/?party=${partyId}`}
+              {`${window.location.origin}/?party=${partyId}`}
             </code>
             <button
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  navigator.clipboard.writeText(`${window.location.origin}/?party=${partyId}`);
-                }
-              }}
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?party=${partyId}`)}
               className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 font-medium shrink-0"
             >
               Copy
