@@ -67,8 +67,8 @@ export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProp
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm/onClose are stable across renders
-  }, [open, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetForm is stable; phase re-runs the effect to refresh focusable after form→success transition
+  }, [open, phase, onClose]);
 
   if (!open) return null;
 
