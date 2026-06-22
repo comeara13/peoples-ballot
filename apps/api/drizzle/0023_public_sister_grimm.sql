@@ -1,2 +1,3 @@
-ALTER TABLE "voters" ADD COLUMN "birth_year" integer;--> statement-breakpoint
-ALTER TABLE "voters" ADD COLUMN "gender" text;
+-- No-op: birth_year and gender were added to voters here but dropped in
+-- migration 0025 before this branch shipped. Net effect on voters is zero.
+-- Ballot-level demographic storage (ballot_demographics) was added in 0024.
