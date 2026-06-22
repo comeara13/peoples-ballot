@@ -50,7 +50,7 @@ describe("ballots", () => {
   it("listByParty       → admin",  () => expectForbidden(anon.ballots.listByParty({ partyId: NIL })));
   it("getById           → public", () => expectNotForbidden(anon.ballots.getById({ id: NIL })));
   it("getByCode         → public", () => expectNotForbidden(anon.ballots.getByCode({ code: "brave-golden-river" })));
-  it("submit            → public", () => expectNotForbidden(anon.ballots.submit({ ballotId: NIL, votes: [] })));
+  it("submit            → public", () => expectNotForbidden(anon.ballots.submit({ ballotId: NIL, votes: [], raceEthnicityCategories: ["prefer_not_to_say"], birthYear: null, gender: "prefer_not_to_say" })));
   it("createForAlwaysOn → public", () => expectNotForbidden(anon.ballots.createForAlwaysOn({ partyId: NIL })));
   it("createForAlwaysOn with non-existent party → NOT_FOUND", async () => {
     await expect(
@@ -123,7 +123,6 @@ describe("affiliations", () => {
 
 describe("assessment", () => {
   it("listQuestionsForBallot  → public", () => expectNotForbidden(anon.assessment.listQuestionsForBallot({ ballotId: NIL, stage: "pre" })));
-  it("submitPostVoteResponses → public", () => expectNotForbidden(anon.assessment.submitPostVoteResponses({ ballotId: NIL, responses: [], raceEthnicityCategories: ["prefer_not_to_say"], birthYear: null, gender: "prefer_not_to_say" })));
   it("listQuestionsForBank    → admin",  () => expectForbidden(anon.assessment.listQuestionsForBank({ ideaBankId: NIL, stage: "pre" })));
   it("createQuestion          → admin",  () => expectForbidden(anon.assessment.createQuestion({ ideaBankId: NIL, text: "x", type: "likert", stage: "pre" })));
   it("deleteQuestion          → admin",  () => expectForbidden(anon.assessment.deleteQuestion({ id: NIL })));

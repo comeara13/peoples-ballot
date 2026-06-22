@@ -379,10 +379,12 @@ const BIRTH_YEARS = Array.from({ length: CURRENT_YEAR - 1920 + 1 }, (_, i) => CU
 
 function PostVoteSurvey({
   ballotId,
+  votes,
   postVoteMessage,
   onComplete,
 }: {
   ballotId: string;
+  votes: { ballotPairId: string; selection: "left" | "right" | "cant_decide" }[];
   postVoteMessage: string;
   onComplete: () => void;
 }) {
@@ -394,7 +396,7 @@ function PostVoteSurvey({
   const [gender, setGender] = useState<string>("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerError, setAnswerError] = useState<string | null>(null);
-  const submit = trpc.assessment.submitPostVoteResponses.useMutation({ onSuccess: onComplete });
+  const submit = trpc.ballots.submit.useMutation({ onSuccess: onComplete });
 
   function toggleRaceCategory(value: string) {
     setRaceCategories((prev) => {
@@ -422,10 +424,11 @@ function PostVoteSurvey({
     }
     submit.mutate({
       ballotId,
-      responses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
+      votes,
       raceEthnicityCategories: raceCategories as (typeof RACE_ETHNICITY_OPTIONS)[number]["value"][],
       birthYear: birthYear === "prefer_not_to_say" ? null : Number(birthYear),
       gender: gender as (typeof GENDER_OPTIONS)[number]["value"],
+      surveyResponses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
     });
   }
 
@@ -609,10 +612,8 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   const [state, setState] = useState<BallotState>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [storySheetOpen, setStorySheetOpen] = useState(false);
-  const [postSurveyDone, setPostSurveyDone] = useState(false);
-  const submitMutation = trpc.ballots.submit.useMutation({
-    onSuccess: invalidateBallot,
-  });
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [surveyDone, setSurveyDone] = useState(false);
 
   if (!isLoading && ballot && !ballot.voterId) {
     return (
@@ -647,17 +648,22 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
-  if (submitMutation.isSuccess && !postSurveyDone) {
+  if (showSurvey && !surveyDone) {
+    const votes = Object.entries(state).map(([ballotPairId, selection]) => ({
+      ballotPairId,
+      selection: selection as "left" | "right" | "cant_decide",
+    }));
     return (
       <PostVoteSurvey
         ballotId={ballot.id}
+        votes={votes}
         postVoteMessage={ballot.postVoteMessage ?? "Thank you for voting!"}
-        onComplete={() => setPostSurveyDone(true)}
+        onComplete={() => { setSurveyDone(true); invalidateBallot(); }}
       />
     );
   }
 
-  if (submitMutation.isSuccess && postSurveyDone) {
+  if (surveyDone) {
     const pairsWithVotes = ballot.pairs.map((p) => ({
       ...p,
       vote: state[p.id] ? { selection: state[p.id] } : null,
@@ -718,13 +724,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   }
 
   function handleSubmit() {
-    submitMutation.mutate({
-      ballotId: ballot!.id,
-      votes: Object.entries(state).map(([ballotPairId, selection]) => ({
-        ballotPairId,
-        selection,
-      })),
-    });
+    setShowSurvey(true);
   }
 
   return (
@@ -821,16 +821,13 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
             )}
             <button
               onClick={handleSubmit}
-              disabled={!allAnswered || submitMutation.isPending || windowClosed}
+              disabled={!allAnswered || windowClosed}
               className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors"
             >
-              {submitMutation.isPending ? "Submitting…" : "Submit Ballot"}
+              Submit Ballot
             </button>
           </div>
         </div>
-        {submitMutation.error && (
-          <p className="text-xs text-red-600 text-center mt-1">{submitMutation.error.message}</p>
-        )}
       </div>
     </div>
   );
