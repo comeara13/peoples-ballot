@@ -60,20 +60,17 @@ export function BankDetail({ bankId }: { bankId: string }) {
         <PostVoteSection key={`pv-${data.id}`} bank={data} />
       </CollapsibleSection>
 
-      <CollapsibleSection
-        title="Ideas"
-        defaultOpen={true}
-        actions={
-          !showAddForm ? (
+      <CollapsibleSection title="Ideas" defaultOpen={true}>
+        {!showAddForm && (
+          <div className="flex justify-end mb-4">
             <button
               onClick={() => setShowAddForm(true)}
               className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 font-medium"
             >
               + Add Idea
             </button>
-          ) : undefined
-        }
-      >
+          </div>
+        )}
         {showAddForm && (
           <AddIdeaForm
             bankId={bankId}
