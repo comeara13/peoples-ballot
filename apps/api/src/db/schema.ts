@@ -101,6 +101,9 @@ export const parties = pgTable(
 
 // OMB Statistical Policy Directive 15 (SPD-15, updated March 2024) race/ethnicity categories.
 // Multi-select: a person may select more than one. "prefer_not_to_say" is mutually exclusive.
+export const GENDER_OPTIONS = ["male", "female", "non_binary", "prefer_not_to_say"] as const;
+export type Gender = (typeof GENDER_OPTIONS)[number];
+
 export const RACE_ETHNICITY_CATEGORIES = [
   "white",
   "black_african_american",
@@ -129,18 +132,6 @@ export const voters = pgTable("voters", {
   consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
-// Multi-select race/ethnicity per OMB SPD-15 2024. One row per selected category per voter.
-export const voterRaceEthnicity = pgTable(
-  "voter_race_ethnicity",
-  {
-    voterId: uuid("voter_id")
-      .references(() => voters.id, { onDelete: "cascade" })
-      .notNull(),
-    category: text("category", { enum: RACE_ETHNICITY_CATEGORIES }).notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.voterId, t.category] })],
-);
 
 // Per-campaign affiliation groups (e.g. "Working Families Party", "Neighbors United").
 // Admins create these per idea bank; the voter intake form shows only the bank's groups.
@@ -230,6 +221,28 @@ export const votes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("votes_ballot_pair_id_idx").on(t.ballotPairId)],
+);
+
+// Ballot-level demographics — written unconditionally so anonymous voters' data is never
+// discarded. When a voter is linked, the same data is also written to voters.birthYear/gender
+// and voterRaceEthnicity for voter-profile queries.
+export const ballotDemographics = pgTable("ballot_demographics", {
+  ballotId: uuid("ballot_id")
+    .references(() => ballots.id, { onDelete: "cascade" })
+    .primaryKey(),
+  birthYear: integer("birth_year"),
+  gender: text("gender", { enum: GENDER_OPTIONS }),
+});
+
+export const ballotRaceEthnicity = pgTable(
+  "ballot_race_ethnicity",
+  {
+    ballotId: uuid("ballot_id")
+      .references(() => ballots.id, { onDelete: "cascade" })
+      .notNull(),
+    category: text("category", { enum: RACE_ETHNICITY_CATEGORIES }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ballotId, t.category] })],
 );
 
 // Voter-submitted idea suggestions, pending human review before entering the answer bank.

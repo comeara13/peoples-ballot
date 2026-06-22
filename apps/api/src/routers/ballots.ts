@@ -5,13 +5,19 @@ import { humanId } from "human-id";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
 import {
+  assessmentQuestions,
+  ballotDemographics,
+  ballotRaceEthnicity,
   ballots,
   ballotPairs,
+  GENDER_OPTIONS,
   ideas,
   ideaBanks,
   parties,
+  postAssessmentResponses,
   prompts,
   ideaTranslations,
+  RACE_ETHNICITY_CATEGORIES,
   votes,
   glossaryTerms,
   ideaGlossaryTerms,
@@ -19,6 +25,7 @@ import {
 import { buildPairWeights, weightedSample } from "../catchup";
 import { checkPartyWindow } from "../partyWindow";
 import { resolveBranding } from "../branding";
+import { isValidSurveyValue } from "../surveyValidation";
 
 const selectionEnum = z.enum(["left", "right", "cant_decide"]);
 
@@ -270,6 +277,17 @@ export const ballotsRouter = router({
             selection: selectionEnum,
           }),
         ),
+        raceEthnicityCategories: z
+          .array(z.enum(RACE_ETHNICITY_CATEGORIES))
+          .min(1, "Race/ethnicity selection is required.")
+          .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
+            message: '"Prefer not to say" cannot be combined with other selections.',
+          }),
+        birthYear: z.number().int().min(1920).max(2030).nullable(),
+        gender: z.enum(GENDER_OPTIONS),
+        surveyResponses: z
+          .array(z.object({ questionId: z.string().uuid(), value: z.string().min(1) }))
+          .default([]),
       }),
     )
     .mutation(async ({ input }) => {
@@ -301,6 +319,33 @@ export const ballotsRouter = router({
           });
       }
 
+      // Validate post-vote survey responses before entering the transaction.
+      const bankQuestions = submitParty
+        ? await db
+            .select({ id: assessmentQuestions.id, type: assessmentQuestions.type })
+            .from(assessmentQuestions)
+            .where(
+              and(
+                eq(assessmentQuestions.ideaBankId, submitParty.ideaBankId),
+                eq(assessmentQuestions.stage, "post"),
+              ),
+            )
+        : [];
+
+      const questionMap = new Map(bankQuestions.map((q) => [q.id, q.type]));
+      const answeredIds = new Set(input.surveyResponses.map((r) => r.questionId));
+
+      if (bankQuestions.length > 0 && !bankQuestions.every((q) => answeredIds.has(q.id))) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "All survey questions must be answered." });
+      }
+
+      for (const r of input.surveyResponses) {
+        const type = questionMap.get(r.questionId);
+        if (!type) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid question ID." });
+        if (!isValidSurveyValue(type, r.value))
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid response value." });
+      }
+
       const pairById = new Map(pairs.map((p) => [p.id, p]));
 
       await db.transaction(async (tx) => {
@@ -319,6 +364,35 @@ export const ballotsRouter = router({
             .set({ votesCount: sql`${prompts.votesCount} + 1` })
             .where(eq(prompts.id, pair.promptId));
         }
+
+        if (input.surveyResponses.length > 0) {
+          await tx
+            .insert(postAssessmentResponses)
+            .values(
+              input.surveyResponses.map((r) => ({
+                ballotId: input.ballotId,
+                questionId: r.questionId,
+                value: r.value,
+              })),
+            )
+            .onConflictDoNothing();
+        }
+
+        // Ballot-level demographics — always written so anonymous voters' data is never lost.
+        await tx
+          .insert(ballotDemographics)
+          .values({ ballotId: input.ballotId, birthYear: input.birthYear, gender: input.gender })
+          .onConflictDoUpdate({
+            target: ballotDemographics.ballotId,
+            set: { birthYear: input.birthYear, gender: input.gender },
+          });
+
+        // Delete then re-insert so a transport-layer retry overwrites stale data,
+        // consistent with ballotDemographics onConflictDoUpdate above.
+        await tx.delete(ballotRaceEthnicity).where(eq(ballotRaceEthnicity.ballotId, input.ballotId));
+        await tx
+          .insert(ballotRaceEthnicity)
+          .values(input.raceEthnicityCategories.map((category) => ({ ballotId: input.ballotId, category })));
 
         await tx
           .update(ballots)

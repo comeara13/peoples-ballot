@@ -8,24 +8,6 @@ import { z } from "zod/v3";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import { trpc } from "@/lib/trpc";
 
-// OMB Statistical Policy Directive 15 (SPD-15, updated March 2024)
-const RACE_ETHNICITY_OPTIONS = [
-  { value: "white", label: "White" },
-  { value: "black_african_american", label: "Black or African American" },
-  { value: "american_indian_alaska_native", label: "American Indian or Alaska Native" },
-  { value: "asian", label: "Asian" },
-  { value: "native_hawaiian_pacific_islander", label: "Native Hawaiian or Pacific Islander" },
-  { value: "middle_eastern_north_african", label: "Middle Eastern or North African" },
-  { value: "prefer_not_to_say", label: "Prefer not to say" },
-] as const;
-
-type RaceEthnicityValue = (typeof RACE_ETHNICITY_OPTIONS)[number]["value"];
-// Tuple cast required by z.enum — same values, typed as non-empty tuple.
-const RACE_ETHNICITY_VALUES = RACE_ETHNICITY_OPTIONS.map((o) => o.value) as [
-  RaceEthnicityValue,
-  ...RaceEthnicityValue[],
-];
-
 const schema = z.object({
   firstName: z.string().min(1, "First name is required").max(100),
   lastName: z.string().min(1, "Last name is required").max(100),
@@ -37,12 +19,6 @@ const schema = z.object({
     .string()
     .transform((v) => v.replace(/-\d{4}$/, ""))
     .pipe(z.string().regex(/^\d{5}$/, "Enter a 5-digit ZIP code")),
-  raceEthnicityCategories: z
-    .array(z.enum(RACE_ETHNICITY_VALUES))
-    .min(1, "Please select at least one option")
-    .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
-      message: '"Prefer not to say" cannot be combined with other selections.',
-    }),
   affiliationIds: z.array(z.string()),
   consent: z.literal(true, {
     errorMap: () => ({ message: "You must consent to continue" }),
@@ -80,7 +56,6 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      raceEthnicityCategories: [],
       affiliationIds: [],
     },
   });
@@ -160,7 +135,6 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
       addressCity: values.addressCity,
       addressState: values.addressState,
       addressZip: values.addressZip,
-      raceEthnicityCategories: values.raceEthnicityCategories,
       affiliationIds: values.affiliationIds,
       consentedAt: new Date().toISOString(),
       assessmentResponses: Object.entries(assessmentAnswers).map(([questionId, value]) => ({
@@ -331,48 +305,6 @@ export function VoterRegistrationForm({ ballotId, onSuccess }: VoterRegistration
                 </div>
               </div>
             </div>
-          </fieldset>
-
-          {/* Race / Ethnicity */}
-          <fieldset>
-            <legend className="text-sm font-semibold text-gray-700 mb-1">Race / Ethnicity</legend>
-            <p className="text-xs text-gray-500 mb-3">
-              Select all that apply. &ldquo;Prefer not to say&rdquo; is mutually exclusive.
-            </p>
-            <Controller
-              name="raceEthnicityCategories"
-              control={control}
-              render={({ field }) => (
-                <div className="space-y-2">
-                  {RACE_ETHNICITY_OPTIONS.map((option) => (
-                    <label key={option.value} className="flex items-center gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        value={option.value}
-                        checked={field.value.includes(option.value)}
-                        onChange={(e) => {
-                          if (option.value === "prefer_not_to_say") {
-                            field.onChange(e.target.checked ? ["prefer_not_to_say"] : []);
-                          } else if (e.target.checked) {
-                            field.onChange([
-                              ...field.value.filter((v) => v !== "prefer_not_to_say"),
-                              option.value,
-                            ]);
-                          } else {
-                            field.onChange(field.value.filter((v) => v !== option.value));
-                          }
-                        }}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            />
-            {errors.raceEthnicityCategories && (
-              <p className="text-xs text-red-600 mt-2">{errors.raceEthnicityCategories.message}</p>
-            )}
           </fieldset>
 
           {/* Community & Political Groups — hidden if campaign has none configured */}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
@@ -7,11 +7,11 @@ import {
   affiliations,
   assessmentQuestions,
   assessmentResponses,
+  ballotDemographics,
+  ballotRaceEthnicity,
   ballots,
   parties,
-  RACE_ETHNICITY_CATEGORIES,
   voterAffiliations,
-  voterRaceEthnicity,
   voters,
 } from "../db/schema";
 import { isValidSurveyValue } from "../surveyValidation";
@@ -29,12 +29,6 @@ const registerInput = z.object({
     .string()
     .transform((v) => v.replace(/-\d{4}$/, ""))
     .pipe(z.string().regex(/^\d{5}$/)),
-  raceEthnicityCategories: z
-    .array(z.enum(RACE_ETHNICITY_CATEGORIES))
-    .min(1)
-    .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
-      message: '"Prefer not to say" cannot be combined with other selections.',
-    }),
   affiliationIds: z.array(z.string().uuid()),
   consentedAt: z.string().datetime(),
   assessmentResponses: z.array(
@@ -124,14 +118,7 @@ export const votersRouter = router({
       }
 
       // onConflictDoNothing handles the case where a returning voter re-selects the same
-      // categories/affiliations they already have on record.
-      if (input.raceEthnicityCategories.length > 0) {
-        await tx
-          .insert(voterRaceEthnicity)
-          .values(input.raceEthnicityCategories.map((category) => ({ voterId, category })))
-          .onConflictDoNothing();
-      }
-
+      // affiliations they already have on record.
       if (input.affiliationIds.length > 0) {
         await tx
           .insert(voterAffiliations)
@@ -161,10 +148,26 @@ export const votersRouter = router({
 
     if (!voter) throw new TRPCError({ code: "NOT_FOUND" });
 
-    const raceCategories = await db
-      .select({ category: voterRaceEthnicity.category })
-      .from(voterRaceEthnicity)
-      .where(eq(voterRaceEthnicity.voterId, input.id));
+    // Demographics come from the most recent submitted ballot — the ballot-level tables
+    // are the single source of truth and cover both anonymous and identified voters.
+    const [latestWithDemo] = await db
+      .select({
+        ballotId: ballots.id,
+        birthYear: ballotDemographics.birthYear,
+        gender: ballotDemographics.gender,
+      })
+      .from(ballots)
+      .innerJoin(ballotDemographics, eq(ballotDemographics.ballotId, ballots.id))
+      .where(and(eq(ballots.voterId, input.id), eq(ballots.status, "submitted")))
+      .orderBy(desc(ballots.submittedAt))
+      .limit(1);
+
+    const raceCategories = latestWithDemo
+      ? await db
+          .select({ category: ballotRaceEthnicity.category })
+          .from(ballotRaceEthnicity)
+          .where(eq(ballotRaceEthnicity.ballotId, latestWithDemo.ballotId))
+      : [];
 
     const affiliationRows = await db
       .select({ id: affiliations.id, name: affiliations.name })
@@ -174,6 +177,8 @@ export const votersRouter = router({
 
     return {
       ...voter,
+      birthYear: latestWithDemo?.birthYear ?? null,
+      gender: latestWithDemo?.gender ?? null,
       raceEthnicityCategories: raceCategories.map((r) => r.category),
       affiliations: affiliationRows,
     };

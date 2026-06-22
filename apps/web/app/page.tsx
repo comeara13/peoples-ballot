@@ -354,27 +354,70 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
   );
 }
 
+// Values must match RACE_ETHNICITY_CATEGORIES in apps/api/src/db/schema.ts
+// OMB SPD-15 (March 2024) — multi-select; "prefer_not_to_say" is mutually exclusive.
+const RACE_ETHNICITY_OPTIONS = [
+  { value: "white", label: "White" },
+  { value: "black_african_american", label: "Black or African American" },
+  { value: "american_indian_alaska_native", label: "American Indian or Alaska Native" },
+  { value: "asian", label: "Asian" },
+  { value: "native_hawaiian_pacific_islander", label: "Native Hawaiian or Pacific Islander" },
+  { value: "middle_eastern_north_african", label: "Middle Eastern or North African" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+] as const;
+
+// Values must match GENDER_OPTIONS in apps/api/src/db/schema.ts
+const GENDER_OPTIONS = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "non_binary", label: "Non Binary" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+] as const;
+
+// Fixed upper bound avoids stale value on tabs open through a year rollover.
+const BIRTH_YEAR_MAX = 2030;
+const BIRTH_YEARS = Array.from({ length: BIRTH_YEAR_MAX - 1920 + 1 }, (_, i) => BIRTH_YEAR_MAX - i);
+
 // ─── Post-vote survey ─────────────────────────────────────────────────────────
 
 function PostVoteSurvey({
   ballotId,
+  votes,
   postVoteMessage,
   onComplete,
 }: {
   ballotId: string;
+  votes: { ballotPairId: string; selection: "left" | "right" | "cant_decide" }[];
   postVoteMessage: string;
   onComplete: () => void;
 }) {
   const { data: questions = [], isLoading } = trpc.assessment.listQuestionsForBallot.useQuery(
     { ballotId, stage: "post" },
   );
+  const [raceCategories, setRaceCategories] = useState<string[]>([]);
+  const [birthYear, setBirthYear] = useState<string>("");
+  const [gender, setGender] = useState<string>("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerError, setAnswerError] = useState<string | null>(null);
-  const submit = trpc.assessment.submitPostVoteResponses.useMutation({ onSuccess: onComplete });
+  const submit = trpc.ballots.submit.useMutation({ onSuccess: onComplete });
+
+  function toggleRaceCategory(value: string) {
+    setRaceCategories((prev) => {
+      if (value === "prefer_not_to_say") {
+        return prev.includes("prefer_not_to_say") ? [] : ["prefer_not_to_say"];
+      }
+      const withoutPnts = prev.filter((v) => v !== "prefer_not_to_say");
+      return prev.includes(value)
+        ? withoutPnts.filter((v) => v !== value)
+        : [...withoutPnts, value];
+    });
+  }
 
   const allAnswered =
-    questions.length === 0 ||
-    questions.every((q) => answers[q.id] !== undefined);
+    raceCategories.length > 0 &&
+    birthYear !== "" &&
+    gender !== "" &&
+    (questions.length === 0 || questions.every((q) => answers[q.id] !== undefined));
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -384,7 +427,11 @@ function PostVoteSurvey({
     }
     submit.mutate({
       ballotId,
-      responses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
+      votes,
+      raceEthnicityCategories: raceCategories as (typeof RACE_ETHNICITY_OPTIONS)[number]["value"][],
+      birthYear: birthYear === "prefer_not_to_say" ? null : Number(birthYear),
+      gender: gender as (typeof GENDER_OPTIONS)[number]["value"],
+      surveyResponses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
     });
   }
 
@@ -395,21 +442,120 @@ function PostVoteSurvey({
           <p className="text-lg font-semibold text-gray-900">{postVoteMessage}</p>
         </div>
 
-        {!isLoading && questions.length > 0 && (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <h2 className="text-base font-semibold text-gray-900">A few quick questions</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Race / Ethnicity — collected post-vote, above assessment questions */}
+          <fieldset>
+            <legend className="text-base font-semibold text-gray-900 mb-1">
+              Race / Ethnicity <span aria-hidden="true" className="text-red-500">*</span>
+            </legend>
+            <p className="text-xs text-gray-500 mb-3">
+              Select all that apply. &ldquo;Prefer not to say&rdquo; is mutually exclusive.
+            </p>
+            <div className="space-y-2">
+              {RACE_ETHNICITY_OPTIONS.map((option) => (
+                <label key={option.value} className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    value={option.value}
+                    checked={raceCategories.includes(option.value)}
+                    onChange={() => toggleRaceCategory(option.value)}
+                    aria-required="true"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
-            {questions.map((q) => (
-              <div key={q.id}>
-                <p className="text-sm text-gray-800 mb-3">{q.text}</p>
-                {q.type === "likert" ? (
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
-                      <span>Strongly Disagree</span>
-                      <span>Strongly Agree</span>
+          {/* Birth year */}
+          <fieldset>
+            <legend className="text-base font-semibold text-gray-900 mb-3">
+              Year of Birth <span aria-hidden="true" className="text-red-500">*</span>
+            </legend>
+            <select
+              value={birthYear}
+              onChange={(e) => setBirthYear(e.target.value)}
+              aria-required="true"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select year…</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+              {BIRTH_YEARS.map((y) => (
+                <option key={y} value={String(y)}>{y}</option>
+              ))}
+            </select>
+          </fieldset>
+
+          {/* Gender */}
+          <fieldset>
+            <legend className="text-base font-semibold text-gray-900 mb-3">
+              Gender <span aria-hidden="true" className="text-red-500">*</span>
+            </legend>
+            <div className="flex flex-wrap gap-2" role="radiogroup">
+              {GENDER_OPTIONS.map((option) => {
+                const selected = gender === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setGender(option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      selected
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {!isLoading && questions.length > 0 && (
+            <div className="space-y-6">
+              <h2 className="text-base font-semibold text-gray-900">A few quick questions</h2>
+
+              {questions.map((q) => (
+                <div key={q.id}>
+                  <p className="text-sm text-gray-800 mb-3">{q.text}</p>
+                  {q.type === "likert" ? (
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
+                        <span>Strongly Disagree</span>
+                        <span>Strongly Agree</span>
+                      </div>
+                      <div className="flex gap-2" role="radiogroup" aria-label={q.text}>
+                        {["1", "2", "3", "4", "5"].map((val) => {
+                          const selected = answers[q.id] === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => {
+                                setAnswers((prev) => ({ ...prev, [q.id]: val }));
+                                setAnswerError(null);
+                              }}
+                              className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                selected
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                              }`}
+                            >
+                              {val}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex gap-2" role="radiogroup" aria-label={q.text}>
-                      {["1", "2", "3", "4", "5"].map((val) => {
+                  ) : (
+                    <div className="flex gap-3" role="radiogroup" aria-label={q.text}>
+                      {["yes", "no"].map((val) => {
                         const selected = answers[q.id] === val;
                         return (
                           <button
@@ -421,7 +567,7 @@ function PostVoteSurvey({
                               setAnswers((prev) => ({ ...prev, [q.id]: val }));
                               setAnswerError(null);
                             }}
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 capitalize ${
                               selected
                                 ? "bg-blue-600 border-blue-600 text-white"
                                 : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
@@ -432,62 +578,28 @@ function PostVoteSurvey({
                         );
                       })}
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex gap-3" role="radiogroup" aria-label={q.text}>
-                    {["yes", "no"].map((val) => {
-                      const selected = answers[q.id] === val;
-                      return (
-                        <button
-                          key={val}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          onClick={() => {
-                            setAnswers((prev) => ({ ...prev, [q.id]: val }));
-                            setAnswerError(null);
-                          }}
-                          className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 capitalize ${
-                            selected
-                              ? "bg-blue-600 border-blue-600 text-white"
-                              : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
-            {answerError && (
-              <p role="alert" className="text-xs text-red-600">{answerError}</p>
-            )}
-            {submit.error && (
-              <p role="alert" className="text-xs text-red-600">{submit.error.message}</p>
-            )}
+          {answerError && (
+            <p role="alert" className="text-xs text-red-600">{answerError}</p>
+          )}
+          {submit.error && (
+            <p role="alert" className="text-xs text-red-600">{submit.error.message}</p>
+          )}
 
-            <button
-              type="submit"
-              disabled={!allAnswered || submit.isPending}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg text-sm transition-colors"
-            >
-              {submit.isPending ? "Submitting…" : "Submit Survey"}
-            </button>
-          </form>
-        )}
-
-        <div className="mt-4 text-center">
           <button
-            type="button"
-            onClick={onComplete}
-            className="text-sm text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+            type="submit"
+            disabled={!allAnswered || submit.isPending}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg text-sm transition-colors"
           >
-            Skip to results →
+            {submit.isPending ? "Submitting…" : "Submit Survey"}
           </button>
-        </div>
+        </form>
+
       </div>
     </div>
   );
@@ -511,10 +623,8 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   const [state, setState] = useState<BallotState>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [storySheetOpen, setStorySheetOpen] = useState(false);
-  const [postSurveyDone, setPostSurveyDone] = useState(false);
-  const submitMutation = trpc.ballots.submit.useMutation({
-    onSuccess: invalidateBallot,
-  });
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [surveyDone, setSurveyDone] = useState(false);
 
   if (!isLoading && ballot && !ballot.voterId) {
     return (
@@ -549,17 +659,22 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
     );
   }
 
-  if (submitMutation.isSuccess && !postSurveyDone) {
+  if (showSurvey && !surveyDone) {
+    const votes = Object.entries(state).map(([ballotPairId, selection]) => ({
+      ballotPairId,
+      selection: selection as "left" | "right" | "cant_decide",
+    }));
     return (
       <PostVoteSurvey
         ballotId={ballot.id}
+        votes={votes}
         postVoteMessage={ballot.postVoteMessage ?? "Thank you for voting!"}
-        onComplete={() => setPostSurveyDone(true)}
+        onComplete={() => { setSurveyDone(true); invalidateBallot(); }}
       />
     );
   }
 
-  if (submitMutation.isSuccess && postSurveyDone) {
+  if (surveyDone) {
     const pairsWithVotes = ballot.pairs.map((p) => ({
       ...p,
       vote: state[p.id] ? { selection: state[p.id] } : null,
@@ -620,13 +735,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
   }
 
   function handleSubmit() {
-    submitMutation.mutate({
-      ballotId: ballot!.id,
-      votes: Object.entries(state).map(([ballotPairId, selection]) => ({
-        ballotPairId,
-        selection,
-      })),
-    });
+    setShowSurvey(true);
   }
 
   return (
@@ -723,16 +832,13 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
             )}
             <button
               onClick={handleSubmit}
-              disabled={!allAnswered || submitMutation.isPending || windowClosed}
+              disabled={!allAnswered || windowClosed}
               className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors"
             >
-              {submitMutation.isPending ? "Submitting…" : "Submit Ballot"}
+              Submit Ballot
             </button>
           </div>
         </div>
-        {submitMutation.error && (
-          <p className="text-xs text-red-600 text-center mt-1">{submitMutation.error.message}</p>
-        )}
       </div>
     </div>
   );
