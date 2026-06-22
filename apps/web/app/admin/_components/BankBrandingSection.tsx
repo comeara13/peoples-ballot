@@ -14,6 +14,17 @@ export function BankBrandingSection({ bank }: { bank: { id: string; title: strin
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
+  // Sync state when remote data changes (e.g. after another component invalidates the query).
+  // "Adjust state during render" is the React-recommended alternative to useEffect+setState.
+  const [prevBank, setPrevBank] = useState(bank);
+  if (bank !== prevBank) {
+    setPrevBank(bank);
+    setTitle(bank.title ?? "");
+    setSubtitle(bank.subtitle ?? "");
+    setHeaderImageUrl(bank.headerImageUrl ?? "");
+    setQuestionHeading(bank.questionHeading ?? "");
+  }
+
   const update = trpc.ideaBanks.update.useMutation({
     onSuccess: (data) => {
       utils.ideaBanks.getById.invalidate({ id: bank.id });

@@ -92,9 +92,9 @@ export function BankDetail({ bankId }: { bankId: string }) {
               onSetGlossaryTerms={(ideaId, termIds) =>
                 setIdeaGlossaryTerms.mutate({ ideaId, termIds })
               }
-              onUpsertTranslation={(ideaId, language, text) =>
-                upsertTranslation.mutate({ ideaId, language, text })
-              }
+              onUpsertTranslation={async (ideaId, language, text) => {
+                await upsertTranslation.mutateAsync({ ideaId, language, text });
+              }}
             />
           ))}
         </div>

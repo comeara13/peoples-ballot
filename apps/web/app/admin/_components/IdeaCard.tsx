@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Command } from "cmdk";
 import { trpc } from "@/lib/trpc";
 import {
@@ -144,12 +144,25 @@ export function IdeaCard({
   onSetTags: (ideaId: string, tagIds: string[]) => void;
   availableGlossaryTerms: GlossaryTerm[];
   onSetGlossaryTerms: (ideaId: string, termIds: string[]) => void;
-  onUpsertTranslation: (ideaId: string, language: string, text: string) => void;
+  onUpsertTranslation: (ideaId: string, language: string, text: string) => Promise<void>;
 }) {
   const [editingLang, setEditingLang] = useState<string | null>(null);
+  const [translationError, setTranslationError] = useState<string | null>(null);
   const [addingTranslation, setAddingTranslation] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showGlossaryPicker, setShowGlossaryPicker] = useState(false);
+
+  useEffect(() => {
+    if (!showTagPicker && !showGlossaryPicker) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setShowTagPicker(false);
+        setShowGlossaryPicker(false);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showTagPicker, showGlossaryPicker]);
   const [showLinkedSuggestions, setShowLinkedSuggestions] = useState(false);
   const [showSuggestionPicker, setShowSuggestionPicker] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -362,11 +375,16 @@ export function IdeaCard({
             <EditTranslationForm
               key={t.id}
               translation={t}
-              onSave={(text) => {
-                onUpsertTranslation(idea.id, t.language, text);
-                setEditingLang(null);
+              onSave={async (text) => {
+                setTranslationError(null);
+                try {
+                  await onUpsertTranslation(idea.id, t.language, text);
+                  setEditingLang(null);
+                } catch (err) {
+                  setTranslationError(err instanceof Error ? err.message : "Failed to save translation.");
+                }
               }}
-              onCancel={() => setEditingLang(null)}
+              onCancel={() => { setEditingLang(null); setTranslationError(null); }}
             />
           ) : (
             <TranslationRow
@@ -390,14 +408,23 @@ export function IdeaCard({
         </button>
       )}
 
+      {translationError && (
+        <p className="text-xs text-red-600 mt-1">{translationError}</p>
+      )}
+
       {addingTranslation && (
         <AddTranslationForm
           existingLanguages={existingLanguages}
-          onSave={(language, text) => {
-            onUpsertTranslation(idea.id, language, text);
-            setAddingTranslation(false);
+          onSave={async (language, text) => {
+            setTranslationError(null);
+            try {
+              await onUpsertTranslation(idea.id, language, text);
+              setAddingTranslation(false);
+            } catch (err) {
+              setTranslationError(err instanceof Error ? err.message : "Failed to save translation.");
+            }
           }}
-          onCancel={() => setAddingTranslation(false)}
+          onCancel={() => { setAddingTranslation(false); setTranslationError(null); }}
         />
       )}
 
@@ -500,18 +527,27 @@ export function AddIdeaForm({
   const [language, setLanguage] = useState<Language>("en");
   const [text, setText] = useState("");
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const createIdea = trpc.ideaBanks.createIdea.useMutation();
   const upsertTranslation = trpc.ideaBanks.upsertTranslation.useMutation();
 
   const handleSubmit = async () => {
     if (!text.trim()) return;
-    const idea = await createIdea.mutateAsync({ ideaBankId: bankId });
-    await upsertTranslation.mutateAsync({
-      ideaId: idea.id,
-      language,
-      text: text.trim(),
-    });
-    onAdd();
+    setSubmitError(null);
+    let ideaId: string | null = null;
+    try {
+      const idea = await createIdea.mutateAsync({ ideaBankId: bankId });
+      ideaId = idea.id;
+      await upsertTranslation.mutateAsync({ ideaId: idea.id, language, text: text.trim() });
+      onAdd();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      setSubmitError(
+        ideaId
+          ? `Failed to save idea text — the idea row was created (${ideaId.slice(0, 8)}) but has no translation. Please delete it and try again. Error: ${msg}`
+          : msg,
+      );
+    }
   };
 
   const isPending = createIdea.isPending || upsertTranslation.isPending;
@@ -556,6 +592,7 @@ export function AddIdeaForm({
             Cancel
           </button>
         </div>
+        {submitError && <p className="text-xs text-red-600 mt-1">{submitError}</p>}
       </div>
     </div>
   );

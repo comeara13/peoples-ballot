@@ -63,8 +63,9 @@ function CreatePartyForm({
         </div>
         {mode === "always_on" && (
           <div>
-            <label className="block text-xs text-gray-600 mb-0.5">Pairs per ballot</label>
+            <label htmlFor="create-party-pair-count" className="block text-xs text-gray-600 mb-0.5">Pairs per ballot</label>
             <input
+              id="create-party-pair-count"
               type="number"
               min={1}
               max={50}
@@ -76,8 +77,9 @@ function CreatePartyForm({
         )}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-xs text-gray-600 mb-0.5">Opens (optional)</label>
+            <label htmlFor="create-party-start-at" className="block text-xs text-gray-600 mb-0.5">Opens (optional)</label>
             <input
+              id="create-party-start-at"
               type="datetime-local"
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
@@ -85,8 +87,9 @@ function CreatePartyForm({
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-0.5">Closes (optional)</label>
+            <label htmlFor="create-party-end-at" className="block text-xs text-gray-600 mb-0.5">Closes (optional)</label>
             <input
+              id="create-party-end-at"
               type="datetime-local"
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
@@ -117,7 +120,8 @@ function CreatePartyForm({
 
 export function PartySection({ bankId }: { bankId: string }) {
   const router = useRouter();
-  const { data, isLoading, refetch } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
   const [showCreate, setShowCreate] = useState(false);
 
   return (
@@ -138,7 +142,7 @@ export function PartySection({ bankId }: { bankId: string }) {
           bankId={bankId}
           onCreated={() => {
             setShowCreate(false);
-            refetch();
+            utils.parties.listByBank.invalidate({ ideaBankId: bankId });
           }}
           onCancel={() => setShowCreate(false)}
         />

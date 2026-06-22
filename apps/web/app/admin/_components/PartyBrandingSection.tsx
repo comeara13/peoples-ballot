@@ -22,6 +22,16 @@ export function PartyBrandingSection({
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
+  // Sync state when remote data changes — "adjust during render" pattern.
+  const [prevParty, setPrevParty] = useState(party);
+  if (party !== prevParty) {
+    setPrevParty(party);
+    setTitle(party.title ?? "");
+    setSubtitle(party.subtitle ?? "");
+    setHeaderImageUrl(party.headerImageUrl ?? "");
+    setQuestionHeading(party.questionHeading ?? "");
+  }
+
   const update = trpc.parties.update.useMutation({
     onSuccess: (data) => {
       utils.parties.listByBank.invalidate({ ideaBankId: bankId });

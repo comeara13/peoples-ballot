@@ -19,12 +19,21 @@ export function TagManagementSection() {
     },
     onError: (err) => setAddError(err.message),
   });
+  const [archivePending, setArchivePending] = useState<Set<string>>(new Set());
   const archiveMutation = trpc.tags.archive.useMutation({
     onSuccess: () => utils.tags.list.invalidate(),
   });
   const unarchiveMutation = trpc.tags.unarchive.useMutation({
     onSuccess: () => utils.tags.list.invalidate(),
   });
+
+  function handleArchive(id: string) {
+    setArchivePending((prev) => new Set(prev).add(id));
+    archiveMutation.mutate(
+      { id },
+      { onSettled: () => setArchivePending((prev) => { const s = new Set(prev); s.delete(id); return s; }) },
+    );
+  }
 
   const activeTags = allTags?.filter((t) => !t.archivedAt) ?? [];
   const archivedTags = allTags?.filter((t) => t.archivedAt) ?? [];
@@ -61,8 +70,8 @@ export function TagManagementSection() {
                   >
                     <span className="text-xs text-gray-800">{tag.name}</span>
                     <button
-                      onClick={() => archiveMutation.mutate({ id: tag.id })}
-                      disabled={archiveMutation.isPending}
+                      onClick={() => handleArchive(tag.id)}
+                      disabled={archivePending.has(tag.id)}
                       title="Archive tag"
                       className="text-gray-400 hover:text-gray-600 text-xs leading-none disabled:opacity-50"
                     >

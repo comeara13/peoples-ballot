@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 import { toDatetimeLocal, windowStatus, WINDOW_STATUS_STYLES, PARTY_STATUS_STYLES } from "./shared";
@@ -18,6 +18,10 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [startAtOverride, setStartAtOverride] = useState<string | null>(null);
   const [endAtOverride, setEndAtOverride] = useState<string | null>(null);
+  const [showWindowSaved, setShowWindowSaved] = useState(false);
+  const windowSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (windowSavedTimer.current) clearTimeout(windowSavedTimer.current); }, []);
+  const [origin] = useState(() => typeof window !== "undefined" ? window.location.origin : "");
 
   const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery({
     partyId,
@@ -41,7 +45,14 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
   });
 
   const update = trpc.parties.update.useMutation({
-    onSuccess: () => utils.parties.listByBank.invalidate({ ideaBankId: bankId }),
+    onSuccess: () => {
+      utils.parties.listByBank.invalidate({ ideaBankId: bankId });
+      setStartAtOverride(null);
+      setEndAtOverride(null);
+      if (windowSavedTimer.current) clearTimeout(windowSavedTimer.current);
+      setShowWindowSaved(true);
+      windowSavedTimer.current = setTimeout(() => setShowWindowSaved(false), 2500);
+    },
   });
 
   const isClosed = party?.status === "closed";
@@ -116,8 +127,9 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
           <div className="border border-gray-200 rounded-lg p-4 bg-white">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Opens</label>
+                <label htmlFor="party-window-opens" className="block text-xs text-gray-600 mb-1">Opens</label>
                 <input
+                  id="party-window-opens"
                   type="datetime-local"
                   value={windowStartAt}
                   onChange={(e) => setStartAtOverride(e.target.value)}
@@ -126,8 +138,9 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Closes (optional)</label>
+                <label htmlFor="party-window-closes" className="block text-xs text-gray-600 mb-1">Closes (optional)</label>
                 <input
+                  id="party-window-closes"
                   type="datetime-local"
                   value={windowEndAt}
                   onChange={(e) => setEndAtOverride(e.target.value)}
@@ -145,9 +158,9 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
                 >
                   {update.isPending ? "Saving…" : "Save Window"}
                 </button>
-                {update.isSuccess && !windowDirty && (
-                  <span className="text-xs text-green-600">Saved</span>
-                )}
+                <span role="status" aria-live="polite" className="text-xs text-green-600">
+                  {showWindowSaved ? "Saved" : ""}
+                </span>
                 {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
               </div>
             )}
@@ -164,7 +177,7 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
             </p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs bg-white border border-purple-200 rounded px-2 py-1.5 text-purple-900 overflow-x-auto whitespace-nowrap">
-                {`${window.location.origin}/?party=${partyId}`}
+                {origin ? `${origin}/?party=${partyId}` : "Loading…"}
               </code>
               <button
                 onClick={() => navigator.clipboard.writeText(`${window.location.origin}/?party=${partyId}`)}

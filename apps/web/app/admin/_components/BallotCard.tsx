@@ -134,6 +134,7 @@ export function BallotCard({
       <div className="flex items-center">
         <button
           onClick={onToggle}
+          aria-expanded={expanded}
           className="flex-1 flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors min-w-0"
         >
           <span className="font-mono text-xs text-gray-500 shrink-0 select-all">{ballot.id}</span>
