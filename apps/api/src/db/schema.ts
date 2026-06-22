@@ -131,22 +131,7 @@ export const voters = pgTable("voters", {
   // CCPA/GDPR: record when the voter consented to data collection.
   consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  // Demographic fields collected post-vote. Null = prefer not to say / not yet collected.
-  birthYear: integer("birth_year"),
-  gender: text("gender", { enum: GENDER_OPTIONS }),
 });
-
-// Multi-select race/ethnicity per OMB SPD-15 2024. One row per selected category per voter.
-export const voterRaceEthnicity = pgTable(
-  "voter_race_ethnicity",
-  {
-    voterId: uuid("voter_id")
-      .references(() => voters.id, { onDelete: "cascade" })
-      .notNull(),
-    category: text("category", { enum: RACE_ETHNICITY_CATEGORIES }).notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.voterId, t.category] })],
-);
 
 // Per-campaign affiliation groups (e.g. "Working Families Party", "Neighbors United").
 // Admins create these per idea bank; the voter intake form shows only the bank's groups.

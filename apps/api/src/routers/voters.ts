@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, adminProcedure } from "../trpc";
 import { db } from "../db";
@@ -7,10 +7,11 @@ import {
   affiliations,
   assessmentQuestions,
   assessmentResponses,
+  ballotDemographics,
+  ballotRaceEthnicity,
   ballots,
   parties,
   voterAffiliations,
-  voterRaceEthnicity,
   voters,
 } from "../db/schema";
 import { isValidSurveyValue } from "../surveyValidation";
@@ -147,10 +148,27 @@ export const votersRouter = router({
 
     if (!voter) throw new TRPCError({ code: "NOT_FOUND" });
 
-    const raceCategories = await db
-      .select({ category: voterRaceEthnicity.category })
-      .from(voterRaceEthnicity)
-      .where(eq(voterRaceEthnicity.voterId, input.id));
+    // Demographics come from the most recent submitted ballot — the ballot-level tables
+    // are the single source of truth and cover both anonymous and identified voters.
+    const [latestBallot] = await db
+      .select({ id: ballots.id })
+      .from(ballots)
+      .innerJoin(ballotDemographics, eq(ballotDemographics.ballotId, ballots.id))
+      .where(and(eq(ballots.voterId, input.id), eq(ballots.status, "submitted")))
+      .orderBy(desc(ballots.submittedAt))
+      .limit(1);
+
+    const demographicsRows = latestBallot
+      ? await db.select().from(ballotDemographics).where(eq(ballotDemographics.ballotId, latestBallot.id))
+      : [];
+    const demographics = demographicsRows[0];
+
+    const raceCategories = latestBallot
+      ? await db
+          .select({ category: ballotRaceEthnicity.category })
+          .from(ballotRaceEthnicity)
+          .where(eq(ballotRaceEthnicity.ballotId, latestBallot.id))
+      : [];
 
     const affiliationRows = await db
       .select({ id: affiliations.id, name: affiliations.name })
@@ -160,6 +178,8 @@ export const votersRouter = router({
 
     return {
       ...voter,
+      birthYear: demographics?.birthYear ?? null,
+      gender: demographics?.gender ?? null,
       raceEthnicityCategories: raceCategories.map((r) => r.category),
       affiliations: affiliationRows,
     };

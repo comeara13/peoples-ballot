@@ -18,8 +18,6 @@ import {
   prompts,
   ideaTranslations,
   RACE_ETHNICITY_CATEGORIES,
-  voterRaceEthnicity,
-  voters,
   votes,
   glossaryTerms,
   ideaGlossaryTerms,
@@ -393,19 +391,6 @@ export const ballotsRouter = router({
           .insert(ballotRaceEthnicity)
           .values(input.raceEthnicityCategories.map((category) => ({ ballotId: input.ballotId, category })))
           .onConflictDoNothing();
-
-        // Voter-level demographics supplementary write for voter-profile queries.
-        if (ballot.voterId) {
-          await tx
-            .insert(voterRaceEthnicity)
-            .values(input.raceEthnicityCategories.map((category) => ({ voterId: ballot.voterId!, category })))
-            .onConflictDoNothing();
-
-          await tx
-            .update(voters)
-            .set({ birthYear: input.birthYear, gender: input.gender })
-            .where(eq(voters.id, ballot.voterId));
-        }
 
         await tx
           .update(ballots)
