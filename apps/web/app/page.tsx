@@ -478,13 +478,15 @@ function PostVoteSurvey({
           {/* Gender */}
           <fieldset>
             <legend className="text-base font-semibold text-gray-900 mb-3">Gender</legend>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Gender">
               {GENDER_OPTIONS.map((option) => {
                 const selected = gender === option.value;
                 return (
                   <button
                     key={option.value}
                     type="button"
+                    role="radio"
+                    aria-checked={selected}
                     onClick={() => setGender(option.value)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       selected

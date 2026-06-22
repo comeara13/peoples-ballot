@@ -238,6 +238,28 @@ export const votes = pgTable(
   (t) => [index("votes_ballot_pair_id_idx").on(t.ballotPairId)],
 );
 
+// Ballot-level demographics — written unconditionally so anonymous voters' data is never
+// discarded. When a voter is linked, the same data is also written to voters.birthYear/gender
+// and voterRaceEthnicity for voter-profile queries.
+export const ballotDemographics = pgTable("ballot_demographics", {
+  ballotId: uuid("ballot_id")
+    .references(() => ballots.id, { onDelete: "cascade" })
+    .primaryKey(),
+  birthYear: integer("birth_year"),
+  gender: text("gender", { enum: GENDER_OPTIONS }),
+});
+
+export const ballotRaceEthnicity = pgTable(
+  "ballot_race_ethnicity",
+  {
+    ballotId: uuid("ballot_id")
+      .references(() => ballots.id, { onDelete: "cascade" })
+      .notNull(),
+    category: text("category", { enum: RACE_ETHNICITY_CATEGORIES }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ballotId, t.category] })],
+);
+
 // Voter-submitted idea suggestions, pending human review before entering the answer bank.
 export const suggestedIdeas = pgTable("suggested_ideas", {
   id: uuid("id").defaultRandom().primaryKey(),

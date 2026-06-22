@@ -6,6 +6,8 @@ import { db } from "../db";
 import {
   assessmentQuestions,
   assessmentResponses,
+  ballotDemographics,
+  ballotRaceEthnicity,
   ballots,
   GENDER_OPTIONS,
   parties,
@@ -169,6 +171,25 @@ export const assessmentRouter = router({
           .onConflictDoNothing();
       }
 
+      // Always write ballot-level demographics — preserves data for anonymous voters
+      // (ballots where no voter registered). On re-submit, birthYear/gender overwrite.
+      await db
+        .insert(ballotDemographics)
+        .values({ ballotId: input.ballotId, birthYear: input.birthYear, gender: input.gender })
+        .onConflictDoUpdate({
+          target: ballotDemographics.ballotId,
+          set: { birthYear: input.birthYear, gender: input.gender },
+        });
+
+      // onConflictDoNothing: first race/ethnicity submission wins for a given ballot.
+      // Asymmetry with birthYear/gender (which overwrite) is intentional — race categories
+      // can't be meaningfully merged if the user re-submits with a different selection.
+      await db
+        .insert(ballotRaceEthnicity)
+        .values(input.raceEthnicityCategories.map((category) => ({ ballotId: input.ballotId, category })))
+        .onConflictDoNothing();
+
+      // Also write to voter-level tables for voter-profile queries (voters.getById).
       if (ballot.voterId) {
         await db
           .insert(voterRaceEthnicity)

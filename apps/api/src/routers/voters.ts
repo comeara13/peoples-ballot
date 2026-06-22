@@ -117,7 +117,7 @@ export const votersRouter = router({
       }
 
       // onConflictDoNothing handles the case where a returning voter re-selects the same
-      // affiliation they already has on record.
+      // affiliations they already have on record.
       if (input.affiliationIds.length > 0) {
         await tx
           .insert(voterAffiliations)
