@@ -11,9 +11,9 @@ export function PostVoteSection({ bank }: { bank: { id: string; postVoteMessage:
 
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
-  const [prevBank, setPrevBank] = useState(bank);
-  if (bank !== prevBank) {
-    setPrevBank(bank);
+  const [prevMessage, setPrevMessage] = useState(bank.postVoteMessage);
+  if (bank.postVoteMessage !== prevMessage) {
+    setPrevMessage(bank.postVoteMessage);
     setMessage(bank.postVoteMessage ?? "");
   }
 

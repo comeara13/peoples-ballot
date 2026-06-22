@@ -20,6 +20,7 @@ export function TagManagementSection() {
     onError: (err) => setAddError(err.message),
   });
   const [archivePending, setArchivePending] = useState<Set<string>>(new Set());
+  const [unarchivePending, setUnarchivePending] = useState<Set<string>>(new Set());
   const archiveMutation = trpc.tags.archive.useMutation({
     onSuccess: () => utils.tags.list.invalidate(),
   });
@@ -32,6 +33,14 @@ export function TagManagementSection() {
     archiveMutation.mutate(
       { id },
       { onSettled: () => setArchivePending((prev) => { const s = new Set(prev); s.delete(id); return s; }) },
+    );
+  }
+
+  function handleUnarchive(id: string) {
+    setUnarchivePending((prev) => new Set(prev).add(id));
+    unarchiveMutation.mutate(
+      { id },
+      { onSettled: () => setUnarchivePending((prev) => { const s = new Set(prev); s.delete(id); return s; }) },
     );
   }
 
@@ -73,7 +82,7 @@ export function TagManagementSection() {
                       onClick={() => handleArchive(tag.id)}
                       disabled={archivePending.has(tag.id)}
                       title="Archive tag"
-                      className="text-gray-400 hover:text-gray-600 text-xs leading-none disabled:opacity-50"
+                      className="text-gray-500 hover:text-gray-600 text-xs leading-none disabled:opacity-50"
                     >
                       ×
                     </button>
@@ -98,13 +107,13 @@ export function TagManagementSection() {
                       key={tag.id}
                       className="flex items-center gap-1.5 border border-dashed border-gray-200 rounded-full pl-3 pr-1.5 py-1 bg-gray-50"
                     >
-                      <span className="text-xs text-gray-400 line-through">{tag.name}</span>
-                      <span className="text-xs text-gray-400">({tag.type === "issue_category" ? "cat" : "scale"})</span>
+                      <span className="text-xs text-gray-500 line-through">{tag.name}</span>
+                      <span className="text-xs text-gray-500">({tag.type === "issue_category" ? "cat" : "scale"})</span>
                       <button
-                        onClick={() => unarchiveMutation.mutate({ id: tag.id })}
-                        disabled={unarchiveMutation.isPending}
+                        onClick={() => handleUnarchive(tag.id)}
+                        disabled={unarchivePending.has(tag.id)}
                         title="Restore tag"
-                        className="text-gray-400 hover:text-green-600 text-xs leading-none disabled:opacity-50"
+                        className="text-gray-500 hover:text-green-600 text-xs leading-none disabled:opacity-50"
                       >
                         ↺
                       </button>

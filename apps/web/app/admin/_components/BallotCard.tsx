@@ -31,7 +31,7 @@ function PairRow({
             selection === "left"
               ? "font-semibold text-blue-700"
               : selection === "right"
-                ? "text-gray-400 line-through"
+                ? "text-gray-500 line-through"
                 : "text-gray-700"
           }`}
         >
@@ -42,7 +42,7 @@ function PairRow({
             selection === "right"
               ? "font-semibold text-blue-700"
               : selection === "left"
-                ? "text-gray-400 line-through"
+                ? "text-gray-500 line-through"
                 : "text-gray-600"
           }`}
         >
@@ -55,7 +55,7 @@ function PairRow({
             ? "text-gray-500"
             : selection
               ? "text-blue-600"
-              : "text-gray-400"
+              : "text-gray-500"
         }`}
       >
         {selection === "left"
@@ -83,6 +83,7 @@ function CopyLinkButton({ accessCode }: { accessCode: string }) {
   return (
     <button
       type="button"
+      aria-label="Copy ballot link"
       title="Copy ballot link"
       onClick={() => {
         navigator.clipboard.writeText(`${window.location.origin}/?ballotId=${encodeURIComponent(accessCode)}`)
@@ -154,7 +155,7 @@ export function BallotCard({
           <span className="text-xs text-gray-600 font-mono shrink-0">
             {new Date(ballot.createdAt).toLocaleString()}
           </span>
-          <span className="ml-auto text-gray-400 text-xs shrink-0">{expanded ? "▲" : "▼"}</span>
+          <span className="ml-auto text-gray-500 text-xs shrink-0">{expanded ? "▲" : "▼"}</span>
         </button>
         {ballot.accessCode && (
           <CopyLinkButton accessCode={ballot.accessCode} />

@@ -297,7 +297,7 @@ export function IdeaCard({
                   if (group.length === 0) return null;
                   return (
                     <div key={key}>
-                      <p className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                      <p className="px-3 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
                         {label}
                       </p>
                       {group.map((tag) => (

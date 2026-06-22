@@ -23,19 +23,17 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
   useEffect(() => () => { if (windowSavedTimer.current) clearTimeout(windowSavedTimer.current); }, []);
   const [origin] = useState(() => typeof window !== "undefined" ? window.location.origin : "");
 
-  const { data: ballotList, refetch: refetchBallots } = trpc.ballots.listByParty.useQuery({
-    partyId,
-  });
+  const { data: ballotList } = trpc.ballots.listByParty.useQuery({ partyId });
   const { data: partiesList } = trpc.parties.listByBank.useQuery({ ideaBankId: bankId });
   const party = partiesList?.find((p) => p.id === partyId);
 
-  const windowStartAt = startAtOverride ?? toDatetimeLocal(party?.startAt);
-  const windowEndAt = endAtOverride ?? toDatetimeLocal(party?.endAt);
+  const windowStartAt = startAtOverride ?? toDatetimeLocal(party?.startAt ?? null);
+  const windowEndAt = endAtOverride ?? toDatetimeLocal(party?.endAt ?? null);
 
   const generate = trpc.ballots.generate.useMutation({
     onSuccess: () => {
       setGenerateError(null);
-      refetchBallots();
+      utils.ballots.listByParty.invalidate({ partyId });
     },
     onError: (e) => setGenerateError(e.message),
   });
@@ -55,7 +53,6 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
     },
   });
 
-  const isClosed = party?.status === "closed";
   const windowDirty =
     party &&
     (toDatetimeLocal(party.startAt) !== windowStartAt ||
@@ -70,7 +67,11 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
     });
   }
 
-  const currentWindowStatus = party ? windowStatus(party) : null;
+  if (!partiesList) return <p className="text-sm text-gray-600 py-8">Loading…</p>;
+  if (!party) return <p className="text-sm text-gray-600 py-8">Party not found.</p>;
+
+  const isClosed = party.status === "closed";
+  const currentWindowStatus = windowStatus(party);
 
   return (
     <div>
@@ -84,8 +85,8 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl font-semibold text-gray-900">{party?.name ?? "Party"}</h1>
-            {party?.mode === "always_on" && (
+            <h1 className="text-xl font-semibold text-gray-900">{party.name}</h1>
+            {party.mode === "always_on" && (
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
                 Always On
               </span>
@@ -122,8 +123,7 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
       </div>
 
       <CollapsibleSection title="Voting Window" defaultOpen={true}>
-        {party && (
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
+        <div className="border border-gray-200 rounded-lg p-4 bg-white">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="party-window-opens" className="block text-xs text-gray-600 mb-1">Opens</label>
@@ -163,11 +163,10 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
                 {update.error && <span className="text-xs text-red-600">{update.error.message}</span>}
               </div>
             )}
-          </div>
-        )}
+        </div>
       </CollapsibleSection>
 
-      {party?.mode === "always_on" && (
+      {party.mode === "always_on" && (
         <CollapsibleSection title="Shareable URL" defaultOpen={true}>
           <div className="border border-purple-200 rounded-lg p-4 bg-purple-50">
             <p className="text-xs text-purple-700 mb-2">
@@ -190,16 +189,14 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
       )}
 
       <CollapsibleSection title="Branding Override" defaultOpen={false}>
-        {party && (
-          <PartyBrandingSection key={party.id} party={party} bankId={bankId} isClosed={isClosed} />
-        )}
+        <PartyBrandingSection key={party.id} party={party} bankId={bankId} isClosed={isClosed} />
       </CollapsibleSection>
 
       <CollapsibleSection
         title="Ballots"
         defaultOpen={true}
         actions={
-          !isClosed && party?.mode !== "always_on" ? (
+          !isClosed && party.mode !== "always_on" ? (
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -218,7 +215,7 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
                 {generate.isPending ? "Generating…" : "Generate Ballot"}
               </button>
             </div>
-          ) : party?.mode === "always_on" ? (
+          ) : party.mode === "always_on" ? (
             <p className="text-xs text-gray-500">Ballots are created automatically when voters visit the link.</p>
           ) : undefined
         }
