@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { TAG_TYPE_STYLES } from "./shared";
 
 export function TagManagementSection() {
   const utils = trpc.useUtils();
