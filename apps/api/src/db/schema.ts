@@ -244,7 +244,6 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
     .notNull(),
   voterId: uuid("voter_id").references(() => voters.id, { onDelete: "set null" }),
   text: text("text").notNull(),
-  testimonial: text("testimonial"),
   status: text("status", {
     enum: ["pending", "approved", "rejected", "merged"],
   })
@@ -252,6 +251,23 @@ export const suggestedIdeas = pgTable("suggested_ideas", {
     .notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const testimonials = pgTable(
+  "testimonials",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ballotId: uuid("ballot_id").references(() => ballots.id, { onDelete: "set null" }),
+    suggestionId: uuid("suggestion_id").references(() => suggestedIdeas.id, {
+      onDelete: "set null",
+    }),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("testimonials_ballot_id_idx").on(t.ballotId),
+    index("testimonials_suggestion_id_idx").on(t.suggestionId),
+  ],
+);
 
 // Platform-wide controlled vocabulary of tags. Typed (issue_category | scale).
 // Tags are archived rather than deleted — archived tags remain on existing items

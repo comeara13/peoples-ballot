@@ -160,6 +160,15 @@ describe("glossary", () => {
   it("getIdeaTermIds → admin",  () => expectForbidden(anon.glossary.getIdeaTermIds({ ideaIds: [NIL] })));
 });
 
+// ── testimonials ─────────────────────────────────────────────────────────────
+
+describe("testimonials", () => {
+  it("submit        → public", () => expectNotForbidden(anon.testimonials.submit({ ballotId: NIL, text: "x" })));
+  it("listForBallot → admin",  () => expectForbidden(anon.testimonials.listForBallot({ ballotId: NIL })));
+  it("listForParty  → admin",  () => expectForbidden(anon.testimonials.listForParty({ partyId: NIL })));
+  it("listForBank   → admin",  () => expectForbidden(anon.testimonials.listForBank({ ideaBankId: NIL })));
+});
+
 // ── suggestionLinks ──────────────────────────────────────────────────────────
 
 describe("suggestionLinks", () => {

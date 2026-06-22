@@ -13,7 +13,6 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
   const [phase, setPhase] = useState<"form" | "success">("form");
   const [text, setText] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-  const [testimonial, setTestimonial] = useState("");
 
   const { data: tags = [] } = trpc.tags.list.useQuery(undefined, { enabled: open });
   const issueCategories = tags.filter((t) => t.type === "issue_category");
@@ -35,14 +34,12 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
       ballotId,
       text: text.trim(),
       tagIds: selectedTagIds,
-      testimonial: testimonial.trim() || undefined,
     });
   }
 
   function resetForm() {
     setText("");
     setSelectedTagIds([]);
-    setTestimonial("");
     submit.reset();
     setPhase("form");
   }
@@ -170,26 +167,6 @@ export function SuggestIdeaSheet({ ballotId, open, onClose }: SuggestIdeaSheetPr
                   )}
                 </div>
               )}
-
-              {/* Testimonial */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Testimonial <span className="font-normal text-gray-500">(optional)</span>
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Why did you submit this idea? What is something you would want to share about why
-                  this idea matters to you? Responses will be anonymized.
-                </p>
-                <textarea
-                  value={testimonial}
-                  onChange={(e) => setTestimonial(e.target.value)}
-                  placeholder="Share your perspective…"
-                  maxLength={5000}
-                  rows={4}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-                <p className="text-xs text-gray-500 mt-1 text-right">{testimonial.length} / 5000</p>
-              </div>
 
               {/* Review note */}
               <p className="text-xs text-gray-500 leading-relaxed">

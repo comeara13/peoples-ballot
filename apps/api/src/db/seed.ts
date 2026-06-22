@@ -2,6 +2,7 @@ import { db } from "./index";
 import {
   affiliations,
   assessmentQuestions,
+  ballots,
   glossaryTerms,
   ideaBanks,
   ideaGlossaryTerms,
@@ -9,6 +10,7 @@ import {
   ideaTranslations,
   parties,
   tags,
+  testimonials,
 } from "./schema";
 import { eq, inArray, isNull, and } from "drizzle-orm";
 
@@ -279,6 +281,42 @@ async function seed() {
     await db.insert(ideaGlossaryTerms).values(ideaLinks).onConflictDoNothing();
   }
   console.log(`Linked ${ideaLinks.length} idea↔glossary-term associations`);
+
+  const existingBallots = await db
+    .select({ id: ballots.id })
+    .from(ballots)
+    .where(eq(ballots.partyId, party.id))
+    .limit(1);
+
+  if (existingBallots.length === 0) {
+    const seedBallots = await db
+      .insert(ballots)
+      .values([
+        { partyId: party.id, status: "submitted" },
+        { partyId: party.id, status: "submitted" },
+        { partyId: party.id, status: "submitted" },
+      ])
+      .returning();
+    console.log(`Created ${seedBallots.length} seed ballots`);
+
+    await db.insert(testimonials).values([
+      {
+        ballotId: seedBallots[0].id,
+        text: "I've seen firsthand how under-resourced our neighborhood schools are. My kids deserve the same opportunities as kids in wealthier neighborhoods.",
+      },
+      {
+        ballotId: seedBallots[1].id,
+        text: "Mental health support saved my life. We need to stop treating this as a luxury and start treating it as the public health issue it is.",
+      },
+      {
+        ballotId: seedBallots[2].id,
+        text: "My brother came home from prison two years ago and couldn't find a single employer willing to give him a chance. We're setting people up to fail.",
+      },
+    ]);
+    console.log("Inserted 3 seed testimonials");
+  } else {
+    console.log("Seed ballots already exist — skipping ballot/testimonial insertion");
+  }
 
   console.log("Done.");
   process.exit(0);
