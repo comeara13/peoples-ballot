@@ -162,6 +162,13 @@
       "when": 1781670404995,
       "tag": "0022_loose_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782102149577,
+      "tag": "0023_public_sister_grimm",
+      "breakpoints": true
     }
   ]
 }

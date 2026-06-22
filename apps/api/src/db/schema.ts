@@ -101,6 +101,9 @@ export const parties = pgTable(
 
 // OMB Statistical Policy Directive 15 (SPD-15, updated March 2024) race/ethnicity categories.
 // Multi-select: a person may select more than one. "prefer_not_to_say" is mutually exclusive.
+export const GENDER_OPTIONS = ["male", "female", "non_binary", "prefer_not_to_say"] as const;
+export type Gender = (typeof GENDER_OPTIONS)[number];
+
 export const RACE_ETHNICITY_CATEGORIES = [
   "white",
   "black_african_american",
@@ -128,6 +131,9 @@ export const voters = pgTable("voters", {
   // CCPA/GDPR: record when the voter consented to data collection.
   consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  // Demographic fields collected post-vote. Null = prefer not to say / not yet collected.
+  birthYear: integer("birth_year"),
+  gender: text("gender", { enum: GENDER_OPTIONS }),
 });
 
 // Multi-select race/ethnicity per OMB SPD-15 2024. One row per selected category per voter.

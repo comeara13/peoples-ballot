@@ -7,10 +7,12 @@ import {
   assessmentQuestions,
   assessmentResponses,
   ballots,
+  GENDER_OPTIONS,
   parties,
   postAssessmentResponses,
   RACE_ETHNICITY_CATEGORIES,
   voterRaceEthnicity,
+  voters,
 } from "../db/schema";
 import { isValidSurveyValue } from "../surveyValidation";
 
@@ -103,6 +105,13 @@ export const assessmentRouter = router({
           .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
             message: '"Prefer not to say" cannot be combined with other selections.',
           }),
+        birthYear: z
+          .number()
+          .int()
+          .min(1920)
+          .max(new Date().getFullYear())
+          .nullable(),
+        gender: z.enum(GENDER_OPTIONS),
       }),
     )
     .mutation(async ({ input }) => {
@@ -160,11 +169,16 @@ export const assessmentRouter = router({
           .onConflictDoNothing();
       }
 
-      if (input.raceEthnicityCategories?.length && ballot.voterId) {
+      if (ballot.voterId) {
         await db
           .insert(voterRaceEthnicity)
           .values(input.raceEthnicityCategories.map((category) => ({ voterId: ballot.voterId!, category })))
           .onConflictDoNothing();
+
+        await db
+          .update(voters)
+          .set({ birthYear: input.birthYear, gender: input.gender })
+          .where(eq(voters.id, ballot.voterId));
       }
 
       return { success: true };

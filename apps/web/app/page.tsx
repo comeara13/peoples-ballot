@@ -365,6 +365,16 @@ const RACE_ETHNICITY_OPTIONS = [
   { value: "prefer_not_to_say", label: "Prefer not to say" },
 ] as const;
 
+const GENDER_OPTIONS = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "non_binary", label: "Non Binary" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+] as const;
+
+const CURRENT_YEAR = new Date().getFullYear();
+const BIRTH_YEARS = Array.from({ length: CURRENT_YEAR - 1920 + 1 }, (_, i) => CURRENT_YEAR - i);
+
 // ─── Post-vote survey ─────────────────────────────────────────────────────────
 
 function PostVoteSurvey({
@@ -380,6 +390,8 @@ function PostVoteSurvey({
     { ballotId, stage: "post" },
   );
   const [raceCategories, setRaceCategories] = useState<string[]>([]);
+  const [birthYear, setBirthYear] = useState<string>("");
+  const [gender, setGender] = useState<string>("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerError, setAnswerError] = useState<string | null>(null);
   const submit = trpc.assessment.submitPostVoteResponses.useMutation({ onSuccess: onComplete });
@@ -396,9 +408,10 @@ function PostVoteSurvey({
     });
   }
 
-  const raceAnswered = raceCategories.length > 0;
   const allAnswered =
-    raceAnswered &&
+    raceCategories.length > 0 &&
+    birthYear !== "" &&
+    gender !== "" &&
     (questions.length === 0 || questions.every((q) => answers[q.id] !== undefined));
 
   function handleSubmit(e: React.FormEvent) {
@@ -411,6 +424,8 @@ function PostVoteSurvey({
       ballotId,
       responses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
       raceEthnicityCategories: raceCategories as (typeof RACE_ETHNICITY_OPTIONS)[number]["value"][],
+      birthYear: birthYear === "prefer_not_to_say" ? null : Number(birthYear),
+      gender: gender as (typeof GENDER_OPTIONS)[number]["value"],
     });
   }
 
@@ -441,6 +456,46 @@ function PostVoteSurvey({
                   <span className="text-sm text-gray-700">{option.label}</span>
                 </label>
               ))}
+            </div>
+          </fieldset>
+
+          {/* Birth year */}
+          <fieldset>
+            <legend className="text-base font-semibold text-gray-900 mb-3">Year of Birth</legend>
+            <select
+              value={birthYear}
+              onChange={(e) => setBirthYear(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select year…</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+              {BIRTH_YEARS.map((y) => (
+                <option key={y} value={String(y)}>{y}</option>
+              ))}
+            </select>
+          </fieldset>
+
+          {/* Gender */}
+          <fieldset>
+            <legend className="text-base font-semibold text-gray-900 mb-3">Gender</legend>
+            <div className="flex flex-wrap gap-2">
+              {GENDER_OPTIONS.map((option) => {
+                const selected = gender === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setGender(option.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      selected
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
           </fieldset>
 

@@ -123,7 +123,7 @@ describe("affiliations", () => {
 
 describe("assessment", () => {
   it("listQuestionsForBallot  → public", () => expectNotForbidden(anon.assessment.listQuestionsForBallot({ ballotId: NIL, stage: "pre" })));
-  it("submitPostVoteResponses → public", () => expectNotForbidden(anon.assessment.submitPostVoteResponses({ ballotId: NIL, responses: [], raceEthnicityCategories: ["prefer_not_to_say"] })));
+  it("submitPostVoteResponses → public", () => expectNotForbidden(anon.assessment.submitPostVoteResponses({ ballotId: NIL, responses: [], raceEthnicityCategories: ["prefer_not_to_say"], birthYear: null, gender: "prefer_not_to_say" })));
   it("listQuestionsForBank    → admin",  () => expectForbidden(anon.assessment.listQuestionsForBank({ ideaBankId: NIL, stage: "pre" })));
   it("createQuestion          → admin",  () => expectForbidden(anon.assessment.createQuestion({ ideaBankId: NIL, text: "x", type: "likert", stage: "pre" })));
   it("deleteQuestion          → admin",  () => expectForbidden(anon.assessment.deleteQuestion({ id: NIL })));
