@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { BrandingField, MarkdownField } from "./BrandingFields";
 
@@ -12,6 +12,7 @@ export function BankBrandingSection({ bank }: { bank: { id: string; title: strin
   const [questionHeading, setQuestionHeading] = useState(bank.questionHeading ?? "");
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
   const update = trpc.ideaBanks.update.useMutation({
     onSuccess: (data) => {

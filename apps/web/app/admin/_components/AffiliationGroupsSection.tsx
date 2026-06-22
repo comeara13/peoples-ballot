@@ -23,12 +23,15 @@ export function AffiliationGroupsSection({ ideaBankId }: { ideaBankId: string })
   });
 
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
+  const [deletePending, setDeletePending] = useState<Set<string>>(new Set());
 
   function handleDelete(id: string) {
     setDeleteErrors((prev) => ({ ...prev, [id]: "" }));
+    setDeletePending((prev) => new Set(prev).add(id));
     deleteMutation.mutate(
       { id },
       {
+        onSettled: () => setDeletePending((prev) => { const s = new Set(prev); s.delete(id); return s; }),
         onError: (err) => setDeleteErrors((prev) => ({ ...prev, [id]: err.message })),
       },
     );
@@ -60,7 +63,7 @@ export function AffiliationGroupsSection({ ideaBankId }: { ideaBankId: string })
                 )}
                 <button
                   onClick={() => handleDelete(group.id)}
-                  disabled={deleteMutation.isPending}
+                  disabled={deletePending.has(group.id)}
                   aria-label={`Delete ${group.name}`}
                   className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
                 >

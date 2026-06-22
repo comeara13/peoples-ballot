@@ -267,7 +267,13 @@ export function IdeaCard({
               + tag
             </button>
             {showTagPicker && (
-              <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[160px]">
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowTagPicker(false)}
+                  aria-hidden
+                />
+                <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[160px]">
                 {(
                   [
                     { key: "issue_category", label: "Issue Category", dot: "bg-indigo-400" },
@@ -295,6 +301,7 @@ export function IdeaCard({
                   );
                 })}
               </div>
+              </>
             )}
           </div>
         )}

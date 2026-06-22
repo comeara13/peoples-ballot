@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { BrandingField, MarkdownField } from "./BrandingFields";
 
@@ -20,6 +20,7 @@ export function PartyBrandingSection({
   const [questionHeading, setQuestionHeading] = useState(party.questionHeading ?? "");
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
   const update = trpc.parties.update.useMutation({
     onSuccess: (data) => {

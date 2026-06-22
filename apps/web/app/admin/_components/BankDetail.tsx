@@ -17,7 +17,7 @@ import { BankTestimonialsSection } from "./TestimonialsSection";
 export function BankDetail({ bankId }: { bankId: string }) {
   const router = useRouter();
   const utils = trpc.useUtils();
-  const { data, isLoading, error, refetch } = trpc.ideaBanks.getById.useQuery({ id: bankId });
+  const { data, isLoading, error } = trpc.ideaBanks.getById.useQuery({ id: bankId });
   const { data: availableTags = [] } = trpc.tags.list.useQuery(undefined);
   const { data: availableGlossaryTerms = [] } = trpc.glossary.list.useQuery({ includeArchived: true });
   const [showAddForm, setShowAddForm] = useState(false);
@@ -29,7 +29,7 @@ export function BankDetail({ bankId }: { bankId: string }) {
     onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
   });
   const upsertTranslation = trpc.ideaBanks.upsertTranslation.useMutation({
-    onSuccess: () => refetch(),
+    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
   });
 
   if (isLoading) return <p className="text-sm text-gray-600">Loading…</p>;
@@ -76,7 +76,7 @@ export function BankDetail({ bankId }: { bankId: string }) {
             bankId={bankId}
             onAdd={() => {
               setShowAddForm(false);
-              refetch();
+              utils.ideaBanks.getById.invalidate({ id: bankId });
             }}
             onCancel={() => setShowAddForm(false)}
           />

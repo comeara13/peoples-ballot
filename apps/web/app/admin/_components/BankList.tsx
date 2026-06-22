@@ -51,7 +51,7 @@ function CreateBankForm({
 
 export function BankList() {
   const router = useRouter();
-  const { data, isLoading, error, refetch } = trpc.ideaBanks.list.useQuery();
+  const { data, isLoading, error } = trpc.ideaBanks.list.useQuery();
   const [showCreate, setShowCreate] = useState(false);
 
   if (isLoading) return <p className="text-sm text-gray-600">Loading…</p>;
@@ -75,7 +75,6 @@ export function BankList() {
         <CreateBankForm
           onCreated={(id) => {
             setShowCreate(false);
-            refetch();
             router.push(`/admin?bankId=${id}`);
           }}
           onCancel={() => setShowCreate(false)}

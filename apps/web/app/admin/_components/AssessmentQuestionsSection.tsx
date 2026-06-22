@@ -33,6 +33,16 @@ export function AssessmentQuestionsSection({
     },
   });
 
+  const [deletePending, setDeletePending] = useState<Set<string>>(new Set());
+
+  function handleDelete(id: string) {
+    setDeletePending((prev) => new Set(prev).add(id));
+    deleteMutation.mutate(
+      { id },
+      { onSettled: () => setDeletePending((prev) => { const s = new Set(prev); s.delete(id); return s; }) },
+    );
+  }
+
   const hint =
     stage === "pre"
       ? "Shown on the voter registration form before voting."
@@ -62,8 +72,8 @@ export function AssessmentQuestionsSection({
                 </span>
               </div>
               <button
-                onClick={() => deleteMutation.mutate({ id: q.id })}
-                disabled={deleteMutation.isPending}
+                onClick={() => handleDelete(q.id)}
+                disabled={deletePending.has(q.id)}
                 aria-label={`Delete question: ${q.text}`}
                 className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 shrink-0"
                 title="Deletes all existing responses for this question"
