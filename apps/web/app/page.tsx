@@ -410,7 +410,7 @@ function PostVoteSurvey({
     submit.mutate({
       ballotId,
       responses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
-      raceEthnicityCategories: raceCategories as typeof RACE_ETHNICITY_OPTIONS[number]["value"][],
+      raceEthnicityCategories: raceCategories as (typeof RACE_ETHNICITY_OPTIONS)[number]["value"][],
     });
   }
 
@@ -529,15 +529,6 @@ function PostVoteSurvey({
           </button>
         </form>
 
-        <div className="mt-4 text-center">
-          <button
-            type="button"
-            onClick={onComplete}
-            className="text-sm text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
-          >
-            Skip to results →
-          </button>
-        </div>
       </div>
     </div>
   );

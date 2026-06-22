@@ -99,10 +99,10 @@ export const assessmentRouter = router({
         responses: z.array(z.object({ questionId: z.string().uuid(), value: z.string().min(1) })),
         raceEthnicityCategories: z
           .array(z.enum(RACE_ETHNICITY_CATEGORIES))
+          .min(1, "Race/ethnicity selection is required.")
           .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
             message: '"Prefer not to say" cannot be combined with other selections.',
-          })
-          .optional(),
+          }),
       }),
     )
     .mutation(async ({ input }) => {
