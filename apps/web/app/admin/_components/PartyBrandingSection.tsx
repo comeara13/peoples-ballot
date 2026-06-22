@@ -22,10 +22,20 @@ export function PartyBrandingSection({
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
-  // Sync state when remote data changes — "adjust during render" pattern.
-  const [prevParty, setPrevParty] = useState(party);
-  if (party !== prevParty) {
-    setPrevParty(party);
+  // Sync state when remote data changes — compare field values, not object reference.
+  const [prevFields, setPrevFields] = useState({
+    title: party.title,
+    subtitle: party.subtitle,
+    headerImageUrl: party.headerImageUrl,
+    questionHeading: party.questionHeading,
+  });
+  if (
+    party.title !== prevFields.title ||
+    party.subtitle !== prevFields.subtitle ||
+    party.headerImageUrl !== prevFields.headerImageUrl ||
+    party.questionHeading !== prevFields.questionHeading
+  ) {
+    setPrevFields({ title: party.title, subtitle: party.subtitle, headerImageUrl: party.headerImageUrl, questionHeading: party.questionHeading });
     setTitle(party.title ?? "");
     setSubtitle(party.subtitle ?? "");
     setHeaderImageUrl(party.headerImageUrl ?? "");

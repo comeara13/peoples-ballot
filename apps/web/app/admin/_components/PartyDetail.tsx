@@ -58,7 +58,6 @@ export function PartyDetail({ bankId, partyId }: { bankId: string; partyId: stri
   const isClosed = party?.status === "closed";
   const windowDirty =
     party &&
-    (startAtOverride !== null || endAtOverride !== null) &&
     (toDatetimeLocal(party.startAt) !== windowStartAt ||
       toDatetimeLocal(party.endAt) !== windowEndAt);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useId } from "react";
 
 export function CollapsibleSection({
   title,
@@ -14,6 +14,7 @@ export function CollapsibleSection({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const contentId = useId();
   return (
     <div className="border-t border-gray-200 mt-6">
       <div className="flex items-center justify-between py-3">
@@ -22,6 +23,7 @@ export function CollapsibleSection({
             onClick={() => setOpen((o) => !o)}
             className="flex items-center gap-2 text-left group"
             aria-expanded={open}
+            aria-controls={contentId}
           >
             <span className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
               {title}
@@ -33,7 +35,7 @@ export function CollapsibleSection({
         </h2>
         {actions && <div className="flex items-center gap-2 ml-3 shrink-0">{actions}</div>}
       </div>
-      {open && <div className="pb-6">{children}</div>}
+      {open && <div id={contentId} className="pb-6">{children}</div>}
     </div>
   );
 }

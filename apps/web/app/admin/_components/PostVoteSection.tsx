@@ -11,6 +11,12 @@ export function PostVoteSection({ bank }: { bank: { id: string; postVoteMessage:
 
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
+  const [prevBank, setPrevBank] = useState(bank);
+  if (bank !== prevBank) {
+    setPrevBank(bank);
+    setMessage(bank.postVoteMessage ?? "");
+  }
+
   const update = trpc.ideaBanks.update.useMutation({
     onSuccess: (data) => {
       utils.ideaBanks.getById.invalidate({ id: bank.id });

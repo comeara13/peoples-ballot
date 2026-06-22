@@ -14,11 +14,20 @@ export function BankBrandingSection({ bank }: { bank: { id: string; title: strin
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
-  // Sync state when remote data changes (e.g. after another component invalidates the query).
-  // "Adjust state during render" is the React-recommended alternative to useEffect+setState.
-  const [prevBank, setPrevBank] = useState(bank);
-  if (bank !== prevBank) {
-    setPrevBank(bank);
+  // Sync state when remote data changes — compare field values, not object reference.
+  const [prevFields, setPrevFields] = useState({
+    title: bank.title,
+    subtitle: bank.subtitle,
+    headerImageUrl: bank.headerImageUrl,
+    questionHeading: bank.questionHeading,
+  });
+  if (
+    bank.title !== prevFields.title ||
+    bank.subtitle !== prevFields.subtitle ||
+    bank.headerImageUrl !== prevFields.headerImageUrl ||
+    bank.questionHeading !== prevFields.questionHeading
+  ) {
+    setPrevFields({ title: bank.title, subtitle: bank.subtitle, headerImageUrl: bank.headerImageUrl, questionHeading: bank.questionHeading });
     setTitle(bank.title ?? "");
     setSubtitle(bank.subtitle ?? "");
     setHeaderImageUrl(bank.headerImageUrl ?? "");

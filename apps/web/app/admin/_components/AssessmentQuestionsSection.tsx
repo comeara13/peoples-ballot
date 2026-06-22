@@ -34,12 +34,17 @@ export function AssessmentQuestionsSection({
   });
 
   const [deletePending, setDeletePending] = useState<Set<string>>(new Set());
+  const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
 
   function handleDelete(id: string) {
+    setDeleteErrors((prev) => ({ ...prev, [id]: "" }));
     setDeletePending((prev) => new Set(prev).add(id));
     deleteMutation.mutate(
       { id },
-      { onSettled: () => setDeletePending((prev) => { const s = new Set(prev); s.delete(id); return s; }) },
+      {
+        onSettled: () => setDeletePending((prev) => { const s = new Set(prev); s.delete(id); return s; }),
+        onError: (err) => setDeleteErrors((prev) => ({ ...prev, [id]: err.message })),
+      },
     );
   }
 
@@ -71,15 +76,20 @@ export function AssessmentQuestionsSection({
                   {q.type === "likert" ? "Likert 1–5" : "Yes / No"}
                 </span>
               </div>
-              <button
-                onClick={() => handleDelete(q.id)}
-                disabled={deletePending.has(q.id)}
-                aria-label={`Delete question: ${q.text}`}
-                className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 shrink-0"
-                title="Deletes all existing responses for this question"
-              >
-                Delete
-              </button>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                {deleteErrors[q.id] && (
+                  <span className="text-xs text-red-600">{deleteErrors[q.id]}</span>
+                )}
+                <button
+                  onClick={() => handleDelete(q.id)}
+                  disabled={deletePending.has(q.id)}
+                  aria-label={`Delete question: ${q.text}`}
+                  className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                  title="Deletes all existing responses for this question"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
