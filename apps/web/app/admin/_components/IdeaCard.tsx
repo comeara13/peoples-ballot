@@ -1,18 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Command } from "cmdk";
 import { trpc } from "@/lib/trpc";
 import {
   LANGUAGES,
   TAG_TYPE_STYLES,
-  SUGGESTION_STATUS_STYLES,
   type Language,
   type Translation,
   type Idea,
   type Tag,
   type GlossaryTerm,
 } from "./shared";
+import { LinkedSuggestionsPanel } from "./LinkedSuggestionsPanel";
 
 function TranslationRow({ translation, onEdit }: { translation: Translation; onEdit: () => void }) {
   return (
@@ -133,24 +132,25 @@ function AddTranslationForm({
 
 export function IdeaCard({
   idea,
+  bankId,
   availableTags,
-  onSetTags,
   availableGlossaryTerms,
-  onSetGlossaryTerms,
   onUpsertTranslation,
 }: {
   idea: Idea;
+  bankId: string;
   availableTags: Tag[];
-  onSetTags: (ideaId: string, tagIds: string[]) => void;
   availableGlossaryTerms: GlossaryTerm[];
-  onSetGlossaryTerms: (ideaId: string, termIds: string[]) => void;
   onUpsertTranslation: (ideaId: string, language: string, text: string) => Promise<void>;
 }) {
+  const utils = trpc.useUtils();
   const [editingLang, setEditingLang] = useState<string | null>(null);
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [addingTranslation, setAddingTranslation] = useState(false);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [showGlossaryPicker, setShowGlossaryPicker] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [glossaryError, setGlossaryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showTagPicker && !showGlossaryPicker) return;
@@ -163,49 +163,27 @@ export function IdeaCard({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [showTagPicker, showGlossaryPicker]);
-  const [showLinkedSuggestions, setShowLinkedSuggestions] = useState(false);
-  const [showSuggestionPicker, setShowSuggestionPicker] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const utils = trpc.useUtils();
 
-  const { data: linkedSuggestions, isLoading: linkedLoading } =
-    trpc.suggestionLinks.listForIdea.useQuery(
-      { ideaId: idea.id },
-      { enabled: showLinkedSuggestions },
-    );
-  const { data: candidateSuggestions } = trpc.suggestionLinks.candidateSuggestions.useQuery(
-    { ideaId: idea.id },
-    { enabled: showSuggestionPicker },
-  );
-  const linkSuggestion = trpc.suggestionLinks.link.useMutation({
-    onSuccess: () => {
-      setLinkError(null);
-      utils.suggestionLinks.listForIdea.invalidate({ ideaId: idea.id });
-      utils.suggestionLinks.candidateSuggestions.invalidate({ ideaId: idea.id });
-      utils.suggestedIdeas.invalidate();
-      setShowSuggestionPicker(false);
-    },
-    onError: (err) => setLinkError(err.message),
+  const setIdeaTags = trpc.ideaBanks.setIdeaTags.useMutation({
+    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
+    onError: (err) => setTagError(err.message),
   });
-  const unlinkSuggestion = trpc.suggestionLinks.unlink.useMutation({
-    onSuccess: () => {
-      setLinkError(null);
-      utils.suggestionLinks.listForIdea.invalidate({ ideaId: idea.id });
-      utils.suggestionLinks.candidateSuggestions.invalidate({ ideaId: idea.id });
-      utils.suggestedIdeas.invalidate();
-    },
-    onError: (err) => setLinkError(err.message),
+  const setIdeaGlossaryTerms = trpc.glossary.setIdeaTerms.useMutation({
+    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
+    onError: (err) => setGlossaryError(err.message),
   });
 
   const currentTagIds = new Set(idea.tags.map((t) => t.id));
   const unpickedTags = availableTags.filter((t) => !currentTagIds.has(t.id) && !t.archivedAt);
 
   function removeTag(tagId: string) {
-    onSetTags(idea.id, idea.tags.filter((t) => t.id !== tagId).map((t) => t.id));
+    setTagError(null);
+    setIdeaTags.mutate({ ideaId: idea.id, tagIds: idea.tags.filter((t) => t.id !== tagId).map((t) => t.id) });
   }
 
   function addTag(tagId: string) {
-    onSetTags(idea.id, [...idea.tags.map((t) => t.id), tagId]);
+    setTagError(null);
+    setIdeaTags.mutate({ ideaId: idea.id, tagIds: [...idea.tags.map((t) => t.id), tagId] });
     setShowTagPicker(false);
   }
 
@@ -215,14 +193,13 @@ export function IdeaCard({
   );
 
   function removeTerm(termId: string) {
-    onSetGlossaryTerms(
-      idea.id,
-      idea.glossaryTerms.filter((t) => t.id !== termId).map((t) => t.id),
-    );
+    setGlossaryError(null);
+    setIdeaGlossaryTerms.mutate({ ideaId: idea.id, termIds: idea.glossaryTerms.filter((t) => t.id !== termId).map((t) => t.id) });
   }
 
   function addTerm(termId: string) {
-    onSetGlossaryTerms(idea.id, [...idea.glossaryTerms.map((t) => t.id), termId]);
+    setGlossaryError(null);
+    setIdeaGlossaryTerms.mutate({ ideaId: idea.id, termIds: [...idea.glossaryTerms.map((t) => t.id), termId] });
     setShowGlossaryPicker(false);
   }
 
@@ -255,7 +232,7 @@ export function IdeaCard({
       </div>
 
       {/* Tag chips + picker */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-3 relative">
+      <div className="flex flex-wrap items-center gap-1.5 mb-1 relative">
         {idea.tags.map((tag) => (
           <span
             key={tag.id}
@@ -264,8 +241,9 @@ export function IdeaCard({
             {tag.name}
             <button
               onClick={() => removeTag(tag.id)}
+              disabled={setIdeaTags.isPending}
               aria-label={`Remove tag ${tag.name}`}
-              className="hover:opacity-60 leading-none"
+              className="hover:opacity-60 leading-none disabled:opacity-40"
             >
               ×
             </button>
@@ -275,7 +253,8 @@ export function IdeaCard({
           <div className="relative">
             <button
               onClick={() => setShowTagPicker((v) => !v)}
-              className="text-xs text-gray-500 hover:text-gray-800 border border-dashed border-gray-300 rounded-full px-2 py-0.5"
+              disabled={setIdeaTags.isPending}
+              className="text-xs text-gray-500 hover:text-gray-800 border border-dashed border-gray-300 rounded-full px-2 py-0.5 disabled:opacity-40"
             >
               + tag
             </button>
@@ -319,9 +298,10 @@ export function IdeaCard({
           </div>
         )}
       </div>
+      {tagError && <p role="alert" className="text-xs text-red-600 mb-1">{tagError}</p>}
 
       {/* Glossary term chips + picker */}
-      <div className="flex flex-wrap items-center gap-1.5 mb-3 relative">
+      <div className="flex flex-wrap items-center gap-1.5 mb-1 relative">
         {idea.glossaryTerms.map((term) => (
           <span
             key={term.id}
@@ -330,8 +310,9 @@ export function IdeaCard({
             {term.title}
             <button
               onClick={() => removeTerm(term.id)}
+              disabled={setIdeaGlossaryTerms.isPending}
               aria-label={`Remove glossary term ${term.title}`}
-              className="hover:opacity-60 leading-none"
+              className="hover:opacity-60 leading-none disabled:opacity-40"
             >
               <span aria-hidden="true">×</span>
             </button>
@@ -341,7 +322,8 @@ export function IdeaCard({
           <div className="relative">
             <button
               onClick={() => setShowGlossaryPicker((v) => !v)}
-              className="text-xs text-gray-500 hover:text-gray-800 border border-dashed border-gray-300 rounded-full px-2 py-0.5"
+              disabled={setIdeaGlossaryTerms.isPending}
+              className="text-xs text-gray-500 hover:text-gray-800 border border-dashed border-gray-300 rounded-full px-2 py-0.5 disabled:opacity-40"
             >
               + glossary
             </button>
@@ -368,8 +350,9 @@ export function IdeaCard({
           </div>
         )}
       </div>
+      {glossaryError && <p role="alert" className="text-xs text-red-600 mb-1">{glossaryError}</p>}
 
-      <div className="space-y-0">
+      <div className="mt-2 space-y-0">
         {idea.translations.map((t) =>
           editingLang === t.language ? (
             <EditTranslationForm
@@ -428,89 +411,7 @@ export function IdeaCard({
         />
       )}
 
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <button
-          onClick={() => setShowLinkedSuggestions((v) => !v)}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 font-medium"
-        >
-          <span>{showLinkedSuggestions ? "▾" : "▸"}</span> Linked Suggestions
-          {linkedSuggestions && linkedSuggestions.length > 0 && (
-            <span className="text-gray-500">({linkedSuggestions.length})</span>
-          )}
-        </button>
-
-        {showLinkedSuggestions && (
-          <div className="mt-2 space-y-1">
-            {linkedLoading && <p className="text-xs text-gray-500">Loading…</p>}
-            {linkError && <p className="text-xs text-red-600">{linkError}</p>}
-            {linkedSuggestions?.map((s) => (
-              <div key={s.id} className="flex items-start gap-2 py-1 border-t border-gray-50 text-xs">
-                <span
-                  className={`shrink-0 px-1.5 py-0.5 rounded-full font-medium ${SUGGESTION_STATUS_STYLES[s.status] ?? "bg-gray-100 text-gray-600"}`}
-                >
-                  {s.status}
-                </span>
-                <span className="flex-1 text-gray-700 leading-snug line-clamp-2">{s.text}</span>
-                <button
-                  onClick={() => unlinkSuggestion.mutate({ suggestionId: s.id, ideaId: idea.id })}
-                  disabled={unlinkSuggestion.isPending}
-                  className="text-red-400 hover:text-red-600 shrink-0 disabled:opacity-50"
-                >
-                  Unlink
-                </button>
-              </div>
-            ))}
-            {!linkedLoading && linkedSuggestions?.length === 0 && (
-              <p className="text-xs text-gray-500 py-1">No suggestions linked yet.</p>
-            )}
-
-            <div className="relative mt-2">
-              <button
-                onClick={() => setShowSuggestionPicker((v) => !v)}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-              >
-                + Link suggestion
-              </button>
-              {showSuggestionPicker && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowSuggestionPicker(false)} aria-hidden />
-                  <div className="absolute top-full left-0 mt-1 z-20 w-80 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    <Command>
-                      <Command.Input
-                        autoFocus
-                        placeholder="Search suggestions…"
-                        className="w-full px-3 py-2 text-sm border-b border-gray-200 outline-none text-gray-800 placeholder:text-gray-400"
-                      />
-                      <Command.List className="max-h-52 overflow-y-auto py-1">
-                        <Command.Empty className="px-3 py-3 text-xs text-gray-500 text-center">
-                          No suggestions found.
-                        </Command.Empty>
-                        {candidateSuggestions?.map((s) => (
-                          <Command.Item
-                            key={s.id}
-                            value={s.text}
-                            onSelect={() =>
-                              linkSuggestion.mutate({ suggestionId: s.id, ideaId: idea.id })
-                            }
-                            className="px-3 py-2 text-xs cursor-pointer aria-selected:bg-blue-50 hover:bg-gray-50"
-                          >
-                            <p className="line-clamp-2 leading-snug text-gray-700">{s.text}</p>
-                            <span
-                              className={`mt-0.5 inline-block px-1.5 rounded-full text-[10px] font-medium ${SUGGESTION_STATUS_STYLES[s.status] ?? "bg-gray-100 text-gray-600"}`}
-                            >
-                              {s.status}
-                            </span>
-                          </Command.Item>
-                        ))}
-                      </Command.List>
-                    </Command>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <LinkedSuggestionsPanel ideaId={idea.id} />
     </div>
   );
 }

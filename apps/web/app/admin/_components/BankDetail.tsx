@@ -21,16 +21,7 @@ export function BankDetail({ bankId }: { bankId: string }) {
   const { data: availableTags = [] } = trpc.tags.list.useQuery(undefined);
   const { data: availableGlossaryTerms = [] } = trpc.glossary.list.useQuery({ includeArchived: true });
   const [showAddForm, setShowAddForm] = useState(false);
-  const [ideaMutationError, setIdeaMutationError] = useState<string | null>(null);
 
-  const setIdeaTags = trpc.ideaBanks.setIdeaTags.useMutation({
-    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
-    onError: (err) => setIdeaMutationError(err.message),
-  });
-  const setIdeaGlossaryTerms = trpc.glossary.setIdeaTerms.useMutation({
-    onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
-    onError: (err) => setIdeaMutationError(err.message),
-  });
   const upsertTranslation = trpc.ideaBanks.upsertTranslation.useMutation({
     onSuccess: () => utils.ideaBanks.getById.invalidate({ id: bankId }),
   });
@@ -74,9 +65,6 @@ export function BankDetail({ bankId }: { bankId: string }) {
             </button>
           </div>
         )}
-        {ideaMutationError && (
-          <p role="alert" className="text-xs text-red-600 mb-3">{ideaMutationError}</p>
-        )}
         {showAddForm && (
           <AddIdeaForm
             bankId={bankId}
@@ -92,12 +80,9 @@ export function BankDetail({ bankId }: { bankId: string }) {
             <IdeaCard
               key={idea.id}
               idea={idea}
+              bankId={bankId}
               availableTags={availableTags}
-              onSetTags={(ideaId, tagIds) => setIdeaTags.mutate({ ideaId, tagIds })}
               availableGlossaryTerms={availableGlossaryTerms}
-              onSetGlossaryTerms={(ideaId, termIds) =>
-                setIdeaGlossaryTerms.mutate({ ideaId, termIds })
-              }
               onUpsertTranslation={async (ideaId, language, text) => {
                 await upsertTranslation.mutateAsync({ ideaId, language, text });
               }}
