@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { SuggestionCard } from "./SuggestionCard";
 import type { SuggestionRow } from "./shared";
 
-export function SuggestionsSection({ data, isLoading }: { data: SuggestionRow[] | undefined; isLoading: boolean }) {
+function SuggestionsSection({ data, isLoading }: { data: SuggestionRow[] | undefined; isLoading: boolean }) {
   return (
     <div>
       {isLoading && <p className="text-sm text-gray-600">Loading…</p>}

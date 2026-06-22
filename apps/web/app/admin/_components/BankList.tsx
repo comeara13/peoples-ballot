@@ -19,7 +19,10 @@ function CreateBankForm({
   return (
     <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 mb-6">
       <h3 className="text-sm font-semibold text-gray-800 mb-3">New Idea Bank</h3>
-      <div className="space-y-2">
+      <form
+        onSubmit={(e) => { e.preventDefault(); if (name.trim()) create.mutate({ name: name.trim() }); }}
+        className="space-y-2"
+      >
         <input
           type="text"
           value={name}
@@ -31,7 +34,7 @@ function CreateBankForm({
         {create.error && <p className="text-xs text-red-600">{create.error.message}</p>}
         <div className="flex gap-2">
           <button
-            onClick={() => name.trim() && create.mutate({ name: name.trim() })}
+            type="submit"
             disabled={!name.trim() || create.isPending}
             className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
           >
@@ -44,7 +47,7 @@ function CreateBankForm({
             Cancel
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
