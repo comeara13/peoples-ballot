@@ -53,6 +53,11 @@ export const TAG_TYPE_STYLES: Record<string, string> = {
   scale: "bg-teal-100 text-teal-700",
 };
 
+export const TAG_TYPE_DOT: Record<string, string> = {
+  issue_category: "bg-indigo-500",
+  scale: "bg-teal-500",
+};
+
 export type Tag = RouterOutput["tags"]["list"][number];
 export type GlossaryTerm = RouterOutput["glossary"]["list"][number];
 

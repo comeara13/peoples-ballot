@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import {
   LANGUAGES,
   TAG_TYPE_STYLES,
+  TAG_TYPE_DOT,
   type Language,
   type Translation,
   type Idea,
@@ -268,10 +269,10 @@ export function IdeaCard({
                 <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-gray-200 rounded-lg shadow-md py-1 min-w-[160px]">
                 {(
                   [
-                    { key: "issue_category", label: "Issue Category", dot: "bg-indigo-400" },
-                    { key: "scale", label: "Scale", dot: "bg-teal-400" },
+                    { key: "issue_category", label: "Issue Category" },
+                    { key: "scale", label: "Scale" },
                   ] as const
-                ).map(({ key, label, dot }) => {
+                ).map(({ key, label }) => {
                   const group = unpickedTags.filter((t) => t.type === key);
                   if (group.length === 0) return null;
                   return (
@@ -285,7 +286,7 @@ export function IdeaCard({
                           onClick={() => addTag(tag.id)}
                           className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                         >
-                          <span className={`inline-block w-2 h-2 rounded-full ${dot}`} />
+                          <span className={`inline-block w-2 h-2 rounded-full ${TAG_TYPE_DOT[key] ?? "bg-gray-400"}`} />
                           {tag.name}
                         </button>
                       ))}
