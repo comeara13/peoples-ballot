@@ -80,7 +80,6 @@ describe("voters", () => {
         addressCity: "Anytown",
         addressState: "CA",
         addressZip: "90210",
-        raceEthnicityCategories: ["white"],
         affiliationIds: [],
         consentedAt: ISO,
         assessmentResponses: [],

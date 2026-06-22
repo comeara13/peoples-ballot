@@ -354,6 +354,17 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
   );
 }
 
+// OMB SPD-15 (March 2024) — multi-select; "prefer_not_to_say" is mutually exclusive.
+const RACE_ETHNICITY_OPTIONS = [
+  { value: "white", label: "White" },
+  { value: "black_african_american", label: "Black or African American" },
+  { value: "american_indian_alaska_native", label: "American Indian or Alaska Native" },
+  { value: "asian", label: "Asian" },
+  { value: "native_hawaiian_pacific_islander", label: "Native Hawaiian or Pacific Islander" },
+  { value: "middle_eastern_north_african", label: "Middle Eastern or North African" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+] as const;
+
 // ─── Post-vote survey ─────────────────────────────────────────────────────────
 
 function PostVoteSurvey({
@@ -368,13 +379,27 @@ function PostVoteSurvey({
   const { data: questions = [], isLoading } = trpc.assessment.listQuestionsForBallot.useQuery(
     { ballotId, stage: "post" },
   );
+  const [raceCategories, setRaceCategories] = useState<string[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answerError, setAnswerError] = useState<string | null>(null);
   const submit = trpc.assessment.submitPostVoteResponses.useMutation({ onSuccess: onComplete });
 
+  function toggleRaceCategory(value: string) {
+    setRaceCategories((prev) => {
+      if (value === "prefer_not_to_say") {
+        return prev.includes("prefer_not_to_say") ? [] : ["prefer_not_to_say"];
+      }
+      const withoutPnts = prev.filter((v) => v !== "prefer_not_to_say");
+      return prev.includes(value)
+        ? withoutPnts.filter((v) => v !== value)
+        : [...withoutPnts, value];
+    });
+  }
+
+  const raceAnswered = raceCategories.length > 0;
   const allAnswered =
-    questions.length === 0 ||
-    questions.every((q) => answers[q.id] !== undefined);
+    raceAnswered &&
+    (questions.length === 0 || questions.every((q) => answers[q.id] !== undefined));
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -385,6 +410,7 @@ function PostVoteSurvey({
     submit.mutate({
       ballotId,
       responses: Object.entries(answers).map(([questionId, value]) => ({ questionId, value })),
+      raceEthnicityCategories: raceCategories as typeof RACE_ETHNICITY_OPTIONS[number]["value"][],
     });
   }
 
@@ -395,21 +421,70 @@ function PostVoteSurvey({
           <p className="text-lg font-semibold text-gray-900">{postVoteMessage}</p>
         </div>
 
-        {!isLoading && questions.length > 0 && (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <h2 className="text-base font-semibold text-gray-900">A few quick questions</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Race / Ethnicity — collected post-vote, above assessment questions */}
+          <fieldset>
+            <legend className="text-base font-semibold text-gray-900 mb-1">Race / Ethnicity</legend>
+            <p className="text-xs text-gray-500 mb-3">
+              Select all that apply. &ldquo;Prefer not to say&rdquo; is mutually exclusive.
+            </p>
+            <div className="space-y-2">
+              {RACE_ETHNICITY_OPTIONS.map((option) => (
+                <label key={option.value} className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    value={option.value}
+                    checked={raceCategories.includes(option.value)}
+                    onChange={() => toggleRaceCategory(option.value)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
-            {questions.map((q) => (
-              <div key={q.id}>
-                <p className="text-sm text-gray-800 mb-3">{q.text}</p>
-                {q.type === "likert" ? (
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
-                      <span>Strongly Disagree</span>
-                      <span>Strongly Agree</span>
+          {!isLoading && questions.length > 0 && (
+            <div className="space-y-6">
+              <h2 className="text-base font-semibold text-gray-900">A few quick questions</h2>
+
+              {questions.map((q) => (
+                <div key={q.id}>
+                  <p className="text-sm text-gray-800 mb-3">{q.text}</p>
+                  {q.type === "likert" ? (
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-500 mb-2 px-1">
+                        <span>Strongly Disagree</span>
+                        <span>Strongly Agree</span>
+                      </div>
+                      <div className="flex gap-2" role="radiogroup" aria-label={q.text}>
+                        {["1", "2", "3", "4", "5"].map((val) => {
+                          const selected = answers[q.id] === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => {
+                                setAnswers((prev) => ({ ...prev, [q.id]: val }));
+                                setAnswerError(null);
+                              }}
+                              className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                selected
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                              }`}
+                            >
+                              {val}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="flex gap-2" role="radiogroup" aria-label={q.text}>
-                      {["1", "2", "3", "4", "5"].map((val) => {
+                  ) : (
+                    <div className="flex gap-3" role="radiogroup" aria-label={q.text}>
+                      {["yes", "no"].map((val) => {
                         const selected = answers[q.id] === val;
                         return (
                           <button
@@ -421,7 +496,7 @@ function PostVoteSurvey({
                               setAnswers((prev) => ({ ...prev, [q.id]: val }));
                               setAnswerError(null);
                             }}
-                            className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 capitalize ${
                               selected
                                 ? "bg-blue-600 border-blue-600 text-white"
                                 : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
@@ -432,52 +507,27 @@ function PostVoteSurvey({
                         );
                       })}
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex gap-3" role="radiogroup" aria-label={q.text}>
-                    {["yes", "no"].map((val) => {
-                      const selected = answers[q.id] === val;
-                      return (
-                        <button
-                          key={val}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          onClick={() => {
-                            setAnswers((prev) => ({ ...prev, [q.id]: val }));
-                            setAnswerError(null);
-                          }}
-                          className={`px-6 py-2 rounded-lg text-sm font-semibold border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 capitalize ${
-                            selected
-                              ? "bg-blue-600 border-blue-600 text-white"
-                              : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
-                          }`}
-                        >
-                          {val}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
-            {answerError && (
-              <p role="alert" className="text-xs text-red-600">{answerError}</p>
-            )}
-            {submit.error && (
-              <p role="alert" className="text-xs text-red-600">{submit.error.message}</p>
-            )}
+          {answerError && (
+            <p role="alert" className="text-xs text-red-600">{answerError}</p>
+          )}
+          {submit.error && (
+            <p role="alert" className="text-xs text-red-600">{submit.error.message}</p>
+          )}
 
-            <button
-              type="submit"
-              disabled={!allAnswered || submit.isPending}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg text-sm transition-colors"
-            >
-              {submit.isPending ? "Submitting…" : "Submit Survey"}
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={!allAnswered || submit.isPending}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg text-sm transition-colors"
+          >
+            {submit.isPending ? "Submitting…" : "Submit Survey"}
+          </button>
+        </form>
 
         <div className="mt-4 text-center">
           <button

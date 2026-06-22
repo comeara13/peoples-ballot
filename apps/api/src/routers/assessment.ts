@@ -9,6 +9,8 @@ import {
   ballots,
   parties,
   postAssessmentResponses,
+  RACE_ETHNICITY_CATEGORIES,
+  voterRaceEthnicity,
 } from "../db/schema";
 import { isValidSurveyValue } from "../surveyValidation";
 
@@ -95,11 +97,17 @@ export const assessmentRouter = router({
       z.object({
         ballotId: z.string().uuid(),
         responses: z.array(z.object({ questionId: z.string().uuid(), value: z.string().min(1) })),
+        raceEthnicityCategories: z
+          .array(z.enum(RACE_ETHNICITY_CATEGORIES))
+          .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
+            message: '"Prefer not to say" cannot be combined with other selections.',
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ input }) => {
       const [ballot] = await db
-        .select({ id: ballots.id, status: ballots.status, ideaBankId: parties.ideaBankId })
+        .select({ id: ballots.id, status: ballots.status, ideaBankId: parties.ideaBankId, voterId: ballots.voterId })
         .from(ballots)
         .innerJoin(parties, eq(parties.id, ballots.partyId))
         .where(eq(ballots.id, input.ballotId));
@@ -149,6 +157,13 @@ export const assessmentRouter = router({
               value: r.value,
             })),
           )
+          .onConflictDoNothing();
+      }
+
+      if (input.raceEthnicityCategories?.length && ballot.voterId) {
+        await db
+          .insert(voterRaceEthnicity)
+          .values(input.raceEthnicityCategories.map((category) => ({ voterId: ballot.voterId!, category })))
           .onConflictDoNothing();
       }
 

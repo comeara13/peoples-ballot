@@ -9,7 +9,6 @@ import {
   assessmentResponses,
   ballots,
   parties,
-  RACE_ETHNICITY_CATEGORIES,
   voterAffiliations,
   voterRaceEthnicity,
   voters,
@@ -29,12 +28,6 @@ const registerInput = z.object({
     .string()
     .transform((v) => v.replace(/-\d{4}$/, ""))
     .pipe(z.string().regex(/^\d{5}$/)),
-  raceEthnicityCategories: z
-    .array(z.enum(RACE_ETHNICITY_CATEGORIES))
-    .min(1)
-    .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
-      message: '"Prefer not to say" cannot be combined with other selections.',
-    }),
   affiliationIds: z.array(z.string().uuid()),
   consentedAt: z.string().datetime(),
   assessmentResponses: z.array(
@@ -124,14 +117,7 @@ export const votersRouter = router({
       }
 
       // onConflictDoNothing handles the case where a returning voter re-selects the same
-      // categories/affiliations they already have on record.
-      if (input.raceEthnicityCategories.length > 0) {
-        await tx
-          .insert(voterRaceEthnicity)
-          .values(input.raceEthnicityCategories.map((category) => ({ voterId, category })))
-          .onConflictDoNothing();
-      }
-
+      // affiliation they already has on record.
       if (input.affiliationIds.length > 0) {
         await tx
           .insert(voterAffiliations)
