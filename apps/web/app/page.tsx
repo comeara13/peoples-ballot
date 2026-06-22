@@ -704,7 +704,7 @@ function LiveBallot({ ballotId }: { ballotId: string }) {
               <span className="ml-2 text-amber-600 text-xs">({total - answered} remaining)</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {!windowClosed && (
               <button
                 onClick={() => setStorySheetOpen(true)}

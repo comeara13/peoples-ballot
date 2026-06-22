@@ -47,9 +47,7 @@ export const testimonialsRouter = router({
           suggestionId: testimonials.suggestionId,
         })
         .from(testimonials)
-        // leftJoin so the query is non-destructive if ballot FK semantics change;
-        // WHERE on ballots.partyId still excludes orphans (null != partyId), which is correct.
-        .leftJoin(ballots, eq(ballots.id, testimonials.ballotId))
+        .innerJoin(ballots, eq(ballots.id, testimonials.ballotId))
         .where(eq(ballots.partyId, input.partyId))
         .orderBy(desc(testimonials.createdAt));
     }),
@@ -67,8 +65,8 @@ export const testimonialsRouter = router({
           partyName: parties.name,
         })
         .from(testimonials)
-        .leftJoin(ballots, eq(ballots.id, testimonials.ballotId))
-        .leftJoin(parties, eq(parties.id, ballots.partyId))
+        .innerJoin(ballots, eq(ballots.id, testimonials.ballotId))
+        .innerJoin(parties, eq(parties.id, ballots.partyId))
         .where(eq(parties.ideaBankId, input.ideaBankId))
         .orderBy(desc(testimonials.createdAt));
     }),

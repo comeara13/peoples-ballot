@@ -292,9 +292,9 @@ async function seed() {
     const seedBallots = await db
       .insert(ballots)
       .values([
-        { ideaBankId: bank.id, partyId: party.id, status: "submitted" },
-        { ideaBankId: bank.id, partyId: party.id, status: "submitted" },
-        { ideaBankId: bank.id, partyId: party.id, status: "submitted" },
+        { partyId: party.id, status: "submitted" },
+        { partyId: party.id, status: "submitted" },
+        { partyId: party.id, status: "submitted" },
       ])
       .returning();
     console.log(`Created ${seedBallots.length} seed ballots`);

@@ -84,7 +84,7 @@ export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProp
         role="dialog"
         ref={dialogRef}
         aria-modal="true"
-        aria-label="Share your story"
+        aria-labelledby="share-story-title"
         className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[90vh] overflow-y-auto"
       >
         <div className="flex justify-center pt-3 pb-1">
@@ -95,7 +95,7 @@ export function ShareStorySheet({ ballotId, open, onClose }: ShareStorySheetProp
           {phase === "form" ? (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Share Your Story</h2>
+                <h2 id="share-story-title" className="text-lg font-semibold text-gray-900">Share Your Story</h2>
                 <p className="text-sm text-gray-600 mt-1">
                   Why does this issue matter to you? Responses will be anonymized and shared in
                   aggregate with policymakers.
