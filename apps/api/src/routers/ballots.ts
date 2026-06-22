@@ -283,7 +283,7 @@ export const ballotsRouter = router({
           .refine((cats) => !(cats.includes("prefer_not_to_say") && cats.length > 1), {
             message: '"Prefer not to say" cannot be combined with other selections.',
           }),
-        birthYear: z.number().int().min(1920).max(new Date().getFullYear()).nullable(),
+        birthYear: z.number().int().min(1920).max(2030).nullable(),
         gender: z.enum(GENDER_OPTIONS),
         surveyResponses: z
           .array(z.object({ questionId: z.string().uuid(), value: z.string().min(1) }))
@@ -387,10 +387,12 @@ export const ballotsRouter = router({
             set: { birthYear: input.birthYear, gender: input.gender },
           });
 
+        // Delete then re-insert so a transport-layer retry overwrites stale data,
+        // consistent with ballotDemographics onConflictDoUpdate above.
+        await tx.delete(ballotRaceEthnicity).where(eq(ballotRaceEthnicity.ballotId, input.ballotId));
         await tx
           .insert(ballotRaceEthnicity)
-          .values(input.raceEthnicityCategories.map((category) => ({ ballotId: input.ballotId, category })))
-          .onConflictDoNothing();
+          .values(input.raceEthnicityCategories.map((category) => ({ ballotId: input.ballotId, category })));
 
         await tx
           .update(ballots)

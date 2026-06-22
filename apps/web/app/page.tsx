@@ -354,6 +354,7 @@ function ResultsView({ pairs }: { pairs: BallotPairWithVote[] }) {
   );
 }
 
+// Values must match RACE_ETHNICITY_CATEGORIES in apps/api/src/db/schema.ts
 // OMB SPD-15 (March 2024) — multi-select; "prefer_not_to_say" is mutually exclusive.
 const RACE_ETHNICITY_OPTIONS = [
   { value: "white", label: "White" },
@@ -365,6 +366,7 @@ const RACE_ETHNICITY_OPTIONS = [
   { value: "prefer_not_to_say", label: "Prefer not to say" },
 ] as const;
 
+// Values must match GENDER_OPTIONS in apps/api/src/db/schema.ts
 const GENDER_OPTIONS = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
@@ -372,8 +374,9 @@ const GENDER_OPTIONS = [
   { value: "prefer_not_to_say", label: "Prefer not to say" },
 ] as const;
 
-const CURRENT_YEAR = new Date().getFullYear();
-const BIRTH_YEARS = Array.from({ length: CURRENT_YEAR - 1920 + 1 }, (_, i) => CURRENT_YEAR - i);
+// Fixed upper bound avoids stale value on tabs open through a year rollover.
+const BIRTH_YEAR_MAX = 2030;
+const BIRTH_YEARS = Array.from({ length: BIRTH_YEAR_MAX - 1920 + 1 }, (_, i) => BIRTH_YEAR_MAX - i);
 
 // ─── Post-vote survey ─────────────────────────────────────────────────────────
 
@@ -441,8 +444,10 @@ function PostVoteSurvey({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Race / Ethnicity — collected post-vote, above assessment questions */}
-          <fieldset>
-            <legend className="text-base font-semibold text-gray-900 mb-1">Race / Ethnicity</legend>
+          <fieldset aria-required="true">
+            <legend className="text-base font-semibold text-gray-900 mb-1">
+              Race / Ethnicity <span aria-hidden="true" className="text-red-500">*</span>
+            </legend>
             <p className="text-xs text-gray-500 mb-3">
               Select all that apply. &ldquo;Prefer not to say&rdquo; is mutually exclusive.
             </p>
@@ -463,11 +468,14 @@ function PostVoteSurvey({
           </fieldset>
 
           {/* Birth year */}
-          <fieldset>
-            <legend className="text-base font-semibold text-gray-900 mb-3">Year of Birth</legend>
+          <fieldset aria-required="true">
+            <legend className="text-base font-semibold text-gray-900 mb-3">
+              Year of Birth <span aria-hidden="true" className="text-red-500">*</span>
+            </legend>
             <select
               value={birthYear}
               onChange={(e) => setBirthYear(e.target.value)}
+              aria-required="true"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select year…</option>
@@ -479,8 +487,10 @@ function PostVoteSurvey({
           </fieldset>
 
           {/* Gender */}
-          <fieldset>
-            <legend className="text-base font-semibold text-gray-900 mb-3">Gender</legend>
+          <fieldset aria-required="true">
+            <legend className="text-base font-semibold text-gray-900 mb-3">
+              Gender <span aria-hidden="true" className="text-red-500">*</span>
+            </legend>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Gender">
               {GENDER_OPTIONS.map((option) => {
                 const selected = gender === option.value;

@@ -150,24 +150,23 @@ export const votersRouter = router({
 
     // Demographics come from the most recent submitted ballot — the ballot-level tables
     // are the single source of truth and cover both anonymous and identified voters.
-    const [latestBallot] = await db
-      .select({ id: ballots.id })
+    const [latestWithDemo] = await db
+      .select({
+        ballotId: ballots.id,
+        birthYear: ballotDemographics.birthYear,
+        gender: ballotDemographics.gender,
+      })
       .from(ballots)
       .innerJoin(ballotDemographics, eq(ballotDemographics.ballotId, ballots.id))
       .where(and(eq(ballots.voterId, input.id), eq(ballots.status, "submitted")))
       .orderBy(desc(ballots.submittedAt))
       .limit(1);
 
-    const demographicsRows = latestBallot
-      ? await db.select().from(ballotDemographics).where(eq(ballotDemographics.ballotId, latestBallot.id))
-      : [];
-    const demographics = demographicsRows[0];
-
-    const raceCategories = latestBallot
+    const raceCategories = latestWithDemo
       ? await db
           .select({ category: ballotRaceEthnicity.category })
           .from(ballotRaceEthnicity)
-          .where(eq(ballotRaceEthnicity.ballotId, latestBallot.id))
+          .where(eq(ballotRaceEthnicity.ballotId, latestWithDemo.ballotId))
       : [];
 
     const affiliationRows = await db
@@ -178,8 +177,8 @@ export const votersRouter = router({
 
     return {
       ...voter,
-      birthYear: demographics?.birthYear ?? null,
-      gender: demographics?.gender ?? null,
+      birthYear: latestWithDemo?.birthYear ?? null,
+      gender: latestWithDemo?.gender ?? null,
       raceEthnicityCategories: raceCategories.map((r) => r.category),
       affiliations: affiliationRows,
     };
