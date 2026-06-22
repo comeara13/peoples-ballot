@@ -3,36 +3,16 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { BrandingField, MarkdownField } from "./BrandingFields";
+import { useBrandingFields } from "./useBrandingFields";
+import type { BrandingFieldSet } from "./shared";
 
-export function BankBrandingSection({ bank }: { bank: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null; questionHeading: string | null } }) {
+export function BankBrandingSection({ bank }: { bank: { id: string } & BrandingFieldSet }) {
   const utils = trpc.useUtils();
-  const [title, setTitle] = useState(bank.title ?? "");
-  const [subtitle, setSubtitle] = useState(bank.subtitle ?? "");
-  const [headerImageUrl, setHeaderImageUrl] = useState(bank.headerImageUrl ?? "");
-  const [questionHeading, setQuestionHeading] = useState(bank.questionHeading ?? "");
+  const { title, setTitle, subtitle, setSubtitle, headerImageUrl, setHeaderImageUrl,
+          questionHeading, setQuestionHeading, dirty } = useBrandingFields(bank);
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
-
-  // Sync state when remote data changes — compare field values, not object reference.
-  const [prevFields, setPrevFields] = useState({
-    title: bank.title,
-    subtitle: bank.subtitle,
-    headerImageUrl: bank.headerImageUrl,
-    questionHeading: bank.questionHeading,
-  });
-  if (
-    bank.title !== prevFields.title ||
-    bank.subtitle !== prevFields.subtitle ||
-    bank.headerImageUrl !== prevFields.headerImageUrl ||
-    bank.questionHeading !== prevFields.questionHeading
-  ) {
-    setPrevFields({ title: bank.title, subtitle: bank.subtitle, headerImageUrl: bank.headerImageUrl, questionHeading: bank.questionHeading });
-    setTitle(bank.title ?? "");
-    setSubtitle(bank.subtitle ?? "");
-    setHeaderImageUrl(bank.headerImageUrl ?? "");
-    setQuestionHeading(bank.questionHeading ?? "");
-  }
 
   const update = trpc.ideaBanks.update.useMutation({
     onSuccess: (data) => {
@@ -46,12 +26,6 @@ export function BankBrandingSection({ bank }: { bank: { id: string; title: strin
       savedTimer.current = setTimeout(() => setShowSaved(false), 2500);
     },
   });
-
-  const dirty =
-    title !== (bank.title ?? "") ||
-    subtitle !== (bank.subtitle ?? "") ||
-    headerImageUrl !== (bank.headerImageUrl ?? "") ||
-    questionHeading !== (bank.questionHeading ?? "");
 
   function save() {
     update.mutate({

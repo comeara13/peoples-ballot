@@ -1,5 +1,12 @@
 import type { RouterOutput } from "@/lib/trpc";
 
+export type BrandingFieldSet = {
+  title: string | null;
+  subtitle: string | null;
+  headerImageUrl: string | null;
+  questionHeading: string | null;
+};
+
 export const LANGUAGES = ["en", "es", "fr", "pt", "zh"] as const;
 export type Language = (typeof LANGUAGES)[number];
 

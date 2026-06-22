@@ -473,7 +473,7 @@ export function IdeaCard({
               </button>
               {showSuggestionPicker && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowSuggestionPicker(false)} />
+                  <div className="fixed inset-0 z-10" onClick={() => setShowSuggestionPicker(false)} aria-hidden />
                   <div className="absolute top-full left-0 mt-1 z-20 w-80 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                     <Command>
                       <Command.Input

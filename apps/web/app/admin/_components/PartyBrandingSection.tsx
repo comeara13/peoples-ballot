@@ -3,44 +3,24 @@
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { BrandingField, MarkdownField } from "./BrandingFields";
+import { useBrandingFields } from "./useBrandingFields";
+import type { BrandingFieldSet } from "./shared";
 
 export function PartyBrandingSection({
   party,
   bankId,
   isClosed,
 }: {
-  party: { id: string; title: string | null; subtitle: string | null; headerImageUrl: string | null; questionHeading: string | null };
+  party: { id: string } & BrandingFieldSet;
   bankId: string;
   isClosed: boolean;
 }) {
   const utils = trpc.useUtils();
-  const [title, setTitle] = useState(party.title ?? "");
-  const [subtitle, setSubtitle] = useState(party.subtitle ?? "");
-  const [headerImageUrl, setHeaderImageUrl] = useState(party.headerImageUrl ?? "");
-  const [questionHeading, setQuestionHeading] = useState(party.questionHeading ?? "");
+  const { title, setTitle, subtitle, setSubtitle, headerImageUrl, setHeaderImageUrl,
+          questionHeading, setQuestionHeading, dirty } = useBrandingFields(party);
   const [showSaved, setShowSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
-
-  // Sync state when remote data changes — compare field values, not object reference.
-  const [prevFields, setPrevFields] = useState({
-    title: party.title,
-    subtitle: party.subtitle,
-    headerImageUrl: party.headerImageUrl,
-    questionHeading: party.questionHeading,
-  });
-  if (
-    party.title !== prevFields.title ||
-    party.subtitle !== prevFields.subtitle ||
-    party.headerImageUrl !== prevFields.headerImageUrl ||
-    party.questionHeading !== prevFields.questionHeading
-  ) {
-    setPrevFields({ title: party.title, subtitle: party.subtitle, headerImageUrl: party.headerImageUrl, questionHeading: party.questionHeading });
-    setTitle(party.title ?? "");
-    setSubtitle(party.subtitle ?? "");
-    setHeaderImageUrl(party.headerImageUrl ?? "");
-    setQuestionHeading(party.questionHeading ?? "");
-  }
 
   const update = trpc.parties.update.useMutation({
     onSuccess: (data) => {
@@ -54,12 +34,6 @@ export function PartyBrandingSection({
       savedTimer.current = setTimeout(() => setShowSaved(false), 2500);
     },
   });
-
-  const dirty =
-    title !== (party.title ?? "") ||
-    subtitle !== (party.subtitle ?? "") ||
-    headerImageUrl !== (party.headerImageUrl ?? "") ||
-    questionHeading !== (party.questionHeading ?? "");
 
   function save() {
     update.mutate({
