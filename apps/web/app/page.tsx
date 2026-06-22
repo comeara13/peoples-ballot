@@ -444,7 +444,7 @@ function PostVoteSurvey({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Race / Ethnicity — collected post-vote, above assessment questions */}
-          <fieldset aria-required="true">
+          <fieldset>
             <legend className="text-base font-semibold text-gray-900 mb-1">
               Race / Ethnicity <span aria-hidden="true" className="text-red-500">*</span>
             </legend>
@@ -459,6 +459,7 @@ function PostVoteSurvey({
                     value={option.value}
                     checked={raceCategories.includes(option.value)}
                     onChange={() => toggleRaceCategory(option.value)}
+                    aria-required="true"
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">{option.label}</span>
@@ -468,7 +469,7 @@ function PostVoteSurvey({
           </fieldset>
 
           {/* Birth year */}
-          <fieldset aria-required="true">
+          <fieldset>
             <legend className="text-base font-semibold text-gray-900 mb-3">
               Year of Birth <span aria-hidden="true" className="text-red-500">*</span>
             </legend>
@@ -487,11 +488,11 @@ function PostVoteSurvey({
           </fieldset>
 
           {/* Gender */}
-          <fieldset aria-required="true">
+          <fieldset>
             <legend className="text-base font-semibold text-gray-900 mb-3">
               Gender <span aria-hidden="true" className="text-red-500">*</span>
             </legend>
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Gender">
+            <div className="flex flex-wrap gap-2" role="radiogroup">
               {GENDER_OPTIONS.map((option) => {
                 const selected = gender === option.value;
                 return (
