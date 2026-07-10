@@ -54,7 +54,18 @@ export function BankDetail({ bankId }: { bankId: string }) {
         <PostVoteSection key={`pv-${data.id}`} bank={data} />
       </CollapsibleSection>
 
-      <CollapsibleSection title="Ideas" defaultOpen={true}>
+      <CollapsibleSection
+        title="Ideas"
+        defaultOpen={true}
+        actions={
+          <button
+            onClick={() => router.push(`/admin/analytics?bankId=${bankId}`)}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50 font-medium"
+          >
+            See analytics
+          </button>
+        }
+      >
         {!showAddForm && (
           <div className="flex justify-end mb-4">
             <button
