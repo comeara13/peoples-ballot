@@ -164,7 +164,20 @@ export function AnalyticsTable({ bankId }: { bankId: string }) {
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b border-gray-200">
                     {headerGroup.headers.map((header) => (
-                      <th key={header.id} className="text-left px-3 py-2 whitespace-nowrap">
+                      <th
+                        key={header.id}
+                        scope="col"
+                        aria-sort={
+                          header.column.getCanSort()
+                            ? header.column.getIsSorted() === "asc"
+                              ? "ascending"
+                              : header.column.getIsSorted() === "desc"
+                                ? "descending"
+                                : "none"
+                            : undefined
+                        }
+                        className="text-left px-3 py-2 whitespace-nowrap"
+                      >
                         {header.column.getCanSort() ? (
                           <button
                             onClick={header.column.getToggleSortingHandler()}
