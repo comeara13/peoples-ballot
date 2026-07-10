@@ -13,9 +13,6 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { trpc, type RouterOutput } from "@/lib/trpc";
 import { TAG_TYPE_STYLES } from "../../_components/shared";
 
-// Must match UNKNOWN_ZIP in apps/api/src/analyticsScoring.ts.
-const UNKNOWN_ZIP = "UNKNOWN";
-
 type IdeaScoreRow = RouterOutput["analytics"]["ideaScores"][number] & { rank: number };
 
 const columnHelper = createColumnHelper<IdeaScoreRow>();
@@ -103,8 +100,8 @@ function ZipFilter({
           <label className="flex items-center gap-1.5 text-sm text-gray-700">
             <input
               type="checkbox"
-              checked={selectedZips.includes(UNKNOWN_ZIP)}
-              onChange={() => onToggle(UNKNOWN_ZIP)}
+              checked={selectedZips.includes(data.unknownSentinel)}
+              onChange={() => onToggle(data.unknownSentinel)}
             />
             Unknown <span className="text-gray-600">({data.unknownCount})</span>
           </label>

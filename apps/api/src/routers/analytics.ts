@@ -15,7 +15,7 @@ import {
   ideaTags,
   tags,
 } from "../db/schema";
-import { parseZipFilter, assembleIdeaScores, type ZipFilter } from "../analyticsScoring";
+import { parseZipFilter, assembleIdeaScores, UNKNOWN_ZIP, type ZipFilter } from "../analyticsScoring";
 
 const zipCodesInput = z.array(z.string()).optional();
 
@@ -51,7 +51,9 @@ export const analyticsRouter = router({
 
       const unknownCount = rows.find((r) => r.zip === null)?.count ?? 0;
 
-      return { zips, unknownCount };
+      // Exposed so the frontend passes back the exact sentinel this API expects
+      // in ideaScores' zipCodes, rather than hand-copying the "UNKNOWN" string.
+      return { zips, unknownCount, unknownSentinel: UNKNOWN_ZIP };
     }),
 
   // Idea list with wins/losses/score/voteCount recomputed from only the votes
