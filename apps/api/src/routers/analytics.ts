@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, count, inArray, or, and, ne } from "drizzle-orm";
+import { eq, count, inArray, or, and, ne, isNull, sql, type SQL } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../trpc";
 import { db } from "../db";
@@ -15,9 +15,17 @@ import {
   ideaTags,
   tags,
 } from "../db/schema";
-import { computeZipFilteredScores, type ZipFilteredVote } from "../analyticsScoring";
+import { parseZipFilter, assembleIdeaScores, type ZipFilter } from "../analyticsScoring";
 
 const zipCodesInput = z.array(z.string()).optional();
+
+/** WHERE condition restricting votes to the selected zips (undefined = no filter). */
+function zipCondition(filter: ZipFilter): SQL | undefined {
+  if (!filter.active) return undefined;
+  return filter.includeUnknown
+    ? or(inArray(voters.addressZip, filter.realZips), isNull(voters.addressZip))
+    : inArray(voters.addressZip, filter.realZips);
+}
 
 export const analyticsRouter = router({
   // Distinct zips (with vote counts) among voters who cast a vote on this bank's
@@ -47,76 +55,60 @@ export const analyticsRouter = router({
     }),
 
   // Idea list with wins/losses/score/voteCount recomputed from only the votes
-  // matching zipCodes (see computeZipFilteredScores for filter semantics).
+  // matching zipCodes. Win/loss counting happens in SQL (GROUP BY) rather than
+  // materializing every vote row in Node — this scales with idea count, not
+  // vote history size.
   ideaScores: adminProcedure
     .input(z.object({ ideaBankId: z.string().uuid(), zipCodes: zipCodesInput }))
     .query(async ({ input }) => {
-      const [bank] = await db.select().from(ideaBanks).where(eq(ideaBanks.id, input.ideaBankId));
+      const [[bank], ideasList] = await Promise.all([
+        db.select().from(ideaBanks).where(eq(ideaBanks.id, input.ideaBankId)),
+        db.select().from(ideas).where(eq(ideas.ideaBankId, input.ideaBankId)),
+      ]);
       if (!bank) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const ideasList = await db.select().from(ideas).where(eq(ideas.ideaBankId, input.ideaBankId));
       const ideaIds = ideasList.map((i) => i.id);
+      if (ideaIds.length === 0) return [];
 
-      const translations =
-        ideaIds.length > 0
-          ? await db.select().from(ideaTranslations).where(inArray(ideaTranslations.ideaId, ideaIds))
-          : [];
+      const filter = parseZipFilter(input.zipCodes);
+      const zipWhere = zipCondition(filter);
 
-      const ideaTagRows =
-        ideaIds.length > 0
-          ? await db
-              .select({ ideaId: ideaTags.ideaId, tag: tags })
-              .from(ideaTags)
-              .innerJoin(tags, eq(tags.id, ideaTags.tagId))
-              .where(inArray(ideaTags.ideaId, ideaIds))
-          : [];
+      // Pivots each vote onto its winner's row (or loser's row) so wins/losses
+      // land on the correct idea regardless of which side of the pair it was on.
+      const winnerId = sql<string>`case when ${votes.selection} = 'left' then ${ballotPairs.leftIdeaId} else ${ballotPairs.rightIdeaId} end`;
+      const loserId = sql<string>`case when ${votes.selection} = 'left' then ${ballotPairs.rightIdeaId} else ${ballotPairs.leftIdeaId} end`;
 
-      const pairsForIdeas =
-        ideaIds.length > 0
-          ? await db
-              .select({
-                id: ballotPairs.id,
-                leftIdeaId: ballotPairs.leftIdeaId,
-                rightIdeaId: ballotPairs.rightIdeaId,
-              })
-              .from(ballotPairs)
-              .where(
-                or(
-                  inArray(ballotPairs.leftIdeaId, ideaIds),
-                  inArray(ballotPairs.rightIdeaId, ideaIds),
-                ),
-              )
-          : [];
+      function outcomeQuery(ideaIdExpr: SQL<string>) {
+        return db
+          .select({ ideaId: ideaIdExpr, total: count() })
+          .from(votes)
+          .innerJoin(ballotPairs, eq(ballotPairs.id, votes.ballotPairId))
+          .innerJoin(ballots, eq(ballots.id, ballotPairs.ballotId))
+          .leftJoin(voters, eq(voters.id, ballots.voterId))
+          .where(
+            and(
+              ne(votes.selection, "cant_decide"),
+              or(inArray(ballotPairs.leftIdeaId, ideaIds), inArray(ballotPairs.rightIdeaId, ideaIds)),
+              zipWhere,
+            ),
+          )
+          .groupBy(ideaIdExpr);
+      }
 
-      const pairIds = pairsForIdeas.map((p) => p.id);
-      const pairById = new Map(pairsForIdeas.map((p) => [p.id, p]));
+      const [winsRows, lossesRows, translations, ideaTagRows] = await Promise.all([
+        outcomeQuery(winnerId),
+        outcomeQuery(loserId),
+        db.select().from(ideaTranslations).where(inArray(ideaTranslations.ideaId, ideaIds)),
+        db
+          .select({ ideaId: ideaTags.ideaId, tag: tags })
+          .from(ideaTags)
+          .innerJoin(tags, eq(tags.id, ideaTags.tagId))
+          .where(inArray(ideaTags.ideaId, ideaIds)),
+      ]);
 
-      const voteRows =
-        pairIds.length > 0
-          ? await db
-              .select({
-                ballotPairId: votes.ballotPairId,
-                selection: votes.selection,
-                zip: voters.addressZip,
-              })
-              .from(votes)
-              .innerJoin(ballotPairs, eq(ballotPairs.id, votes.ballotPairId))
-              .innerJoin(ballots, eq(ballots.id, ballotPairs.ballotId))
-              .leftJoin(voters, eq(voters.id, ballots.voterId))
-              .where(and(inArray(votes.ballotPairId, pairIds), ne(votes.selection, "cant_decide")))
-          : [];
-
-      const voteFacts: ZipFilteredVote[] = voteRows.map((v) => {
-        const pair = pairById.get(v.ballotPairId)!;
-        return {
-          selection: v.selection as "left" | "right",
-          leftIdeaId: pair.leftIdeaId,
-          rightIdeaId: pair.rightIdeaId,
-          zip: v.zip,
-        };
-      });
-
-      const scores = computeZipFilteredScores(ideaIds, voteFacts, input.zipCodes);
+      const winsByIdea = new Map(winsRows.map((r) => [r.ideaId, r.total]));
+      const lossesByIdea = new Map(lossesRows.map((r) => [r.ideaId, r.total]));
+      const scores = assembleIdeaScores(ideaIds, winsByIdea, lossesByIdea);
       const ideaById = new Map(ideasList.map((i) => [i.id, i]));
 
       const translationsByIdeaId = new Map<string, typeof translations>();
