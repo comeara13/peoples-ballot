@@ -11,9 +11,11 @@ import { tagsRouter } from "./tags";
 import { suggestionLinksRouter } from "./suggestionLinks";
 import { glossaryRouter } from "./glossary";
 import { testimonialsRouter } from "./testimonials";
+import { analyticsRouter } from "./analytics";
 
 export const appRouter = router({
   ideaBanks: ideaBanksRouter,
+  analytics: analyticsRouter,
   parties: partiesRouter,
   ballots: ballotsRouter,
   votes: votesRouter,
