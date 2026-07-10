@@ -101,6 +101,13 @@ describe("ideaBanks", () => {
   it("upsertTranslation → admin",  () => expectForbidden(anon.ideaBanks.upsertTranslation({ ideaId: NIL, language: "en", text: "x" })));
 });
 
+// ── analytics ────────────────────────────────────────────────────────────────
+
+describe("analytics", () => {
+  it("zipOptions → admin", () => expectForbidden(anon.analytics.zipOptions({ ideaBankId: NIL })));
+  it("ideaScores → admin", () => expectForbidden(anon.analytics.ideaScores({ ideaBankId: NIL })));
+});
+
 // ── parties ──────────────────────────────────────────────────────────────────
 
 describe("parties", () => {
