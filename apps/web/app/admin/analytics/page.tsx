@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AdminGuard } from "@/components/AdminGuard";
+import { AnalyticsTable } from "./_components/AnalyticsTable";
 
 function AnalyticsPageContent() {
   const searchParams = useSearchParams();
@@ -37,7 +38,7 @@ function AnalyticsPageContent() {
 
         <h1 className="text-xl font-semibold text-gray-900 mb-6">Analytics</h1>
 
-        {/* AnalyticsTable renders here */}
+        <AnalyticsTable bankId={bankId} />
       </div>
     </main>
   );
